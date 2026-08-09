@@ -1,0 +1,28 @@
+.admin-body{padding:24px 16px 60px}
+.admin-wrap{width:min(680px,100%);margin:0 auto}
+.admin-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.admin-header .logo small{display:block;font-size:10px;color:var(--muted);letter-spacing:2px;margin-top:2px}
+.admin-card{
+ background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,255,255,.025));
+ border:1px solid var(--border);border-radius:22px;padding:22px 20px;margin-bottom:20px;
+ backdrop-filter:blur(20px)
+}
+.admin-card h2{margin:0 0 14px;font-size:16px}
+.admin-card h2:after{content:"";display:inline-block;width:28px;height:2px;background:var(--orange);margin-right:8px;vertical-align:middle}
+.admin-card .logo{text-align:center;margin-bottom:6px}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+.stat{background:var(--glass);border:1px solid var(--border);border-radius:16px;padding:14px 6px;text-align:center}
+.stat b{display:block;font-size:20px;color:var(--orange)}
+.stat span{font-size:10px;color:var(--muted)}
+
+.admin-songs{display:flex;flex-direction:column;gap:10px}
+.admin-song{display:flex;align-items:center;gap:12px;padding:10px;border-bottom:1px solid rgba(255,255,255,.08)}
+.admin-song img{width:48px;height:48px;border-radius:12px;object-fit:cover}
+.admin-song-info{flex:1;min-width:0}
+.admin-song-info b{display:block;font-size:13px}
+.admin-song-info small{color:var(--muted);font-size:11px}
+
+@media(max-width:390px){
+ .stats{grid-template-columns:repeat(2,1fr)}
+}
