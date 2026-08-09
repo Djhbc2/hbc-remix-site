@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0b">
+<title>HBC REMIX</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="glow g1"></div><div class="glow g2"></div>
+
+<div id="overlay" class="overlay"></div>
+
+<nav id="drawer" class="drawer">
+  <div class="drawer-head">
+    <div class="logo">HBC <span>REMIX</span></div>
+    <button id="closeDrawer" class="close">✕</button>
+  </div>
+  <div id="drawerUser" class="drawer-user">
+    <p>برای استفاده از امکانات وارد شوید</p>
+  </div>
+  <ul class="drawer-links">
+    <li><button data-nav="songsPage">🎵 لیست آهنگ‌ها</button></li>
+    <li><button data-nav="playlistPage">📑 پلی‌لیست من</button></li>
+    <li><button id="profileNavBtn" data-nav="profilePage" class="hidden">⚙️ پروفایل من</button></li>
+    <li><button data-nav="commentsPage">💬 ثبت نظر</button></li>
+    <li><button id="authNavBtn" data-nav="authPage">👤 ثبت‌نام / ورود</button></li>
+    <li><button id="logoutBtn" class="hidden">🚪 خروج از حساب</button></li>
+  </ul>
+</nav>
+
+<main class="app">
+
+  <section id="songsPage" class="page active">
+    <header class="header">
+      <div class="logo">HBC <span>REMIX</span></div>
+      <button class="menu" id="menuBtn">☰</button>
+    </header>
+
+    <div class="title-row">
+      <h2>لیست آهنگ‌ها</h2>
+      <button id="searchBtn">⌕</button>
+    </div>
+
+    <div class="sort-tabs">
+      <button class="sort-tab active" data-sort="newest">🆕 جدیدترین</button>
+      <button class="sort-tab" data-sort="trending">🔥 پرطرفدار</button>
+    </div>
+
+    <div id="songs" class="songs"></div>
+    <p id="songsEmpty" class="empty hidden">هنوز آهنگی اضافه نشده است.</p>
+  </section>
+
+  <section id="playerPage" class="page player-page">
+    <header class="player-header">
+      <button id="backBtn" class="back">⌄</button>
+      <button class="more">⋮</button>
+    </header>
+
+    <div class="cover-box">
+      <img id="playerCover" src="assets/cover1.jpg" alt="cover">
+    </div>
+
+    <div class="song-info">
+      <button id="likeBtn" class="like">♡</button>
+      <div>
+        <h1 id="playerTitle">Bsdky music</h1>
+        <p id="playerArtist">Disclosure</p>
+      </div>
+    </div>
+
+    <div class="progress">
+      <input id="seek" type="range" min="0" max="100" value="0">
+      <div><span id="current">00:00</span><span id="total">03:20</span></div>
+    </div>
+
+    <div class="controls">
+      <button id="shuffle">🔀</button>
+      <button id="prev">⏮</button>
+      <button id="play" class="play">▶</button>
+      <button id="next">⏭</button>
+      <button id="repeat">↻</button>
+    </div>
+
+    <div class="player-actions">
+      <button id="download" class="download">⇩</button>
+      <button id="openComments">💬</button>
+      <button>⌯</button>
+    </div>
+    <audio id="audio"></audio>
+  </section>
+
+  <section id="authPage" class="page">
+    <header class="header">
+      <button class="back-inline" data-nav="songsPage">→ بازگشت</button>
+    </header>
+    <div class="auth-tabs">
+      <button id="tabLogin" class="tab active">ورود</button>
+      <button id="tabSignup" class="tab">ثبت‌نام</button>
+    </div>
+
+    <form id="loginForm" class="form">
+      <label>ایمیل</label>
+      <input type="email" id="loginEmail" required placeholder="you@example.com">
+      <label>رمز عبور</label>
+      <input type="password" id="loginPassword" required placeholder="••••••••">
+      <button type="submit" class="btn-primary">ورود</button>
+    </form>
+
+    <form id="signupForm" class="form hidden">
+      <label>نام</label>
+      <input type="text" id="signupName" required placeholder="نام شما">
+      <label>ایمیل</label>
+      <input type="email" id="signupEmail" required placeholder="you@example.com">
+      <label>رمز عبور</label>
+      <input type="password" id="signupPassword" required placeholder="حداقل ۶ کاراکتر">
+      <button type="submit" class="btn-primary">ثبت‌نام</button>
+    </form>
+  </section>
+
+  <section id="playlistPage" class="page">
+    <header class="header">
+      <button class="back-inline" data-nav="songsPage">→ بازگشت</button>
+    </header>
+    <div class="title-row"><h2>پلی‌لیست من</h2></div>
+    <div id="playlistSongs" class="songs"></div>
+    <p id="playlistEmpty" class="empty hidden">برای دیدن پلی‌لیست باید وارد حساب شوید و آهنگ سیو کنید.</p>
+  </section>
+
+  <section id="profilePage" class="page">
+    <header class="header">
+      <button class="back-inline" data-nav="songsPage">→ بازگشت</button>
+    </header>
+    <div class="title-row"><h2>پروفایل من</h2></div>
+
+    <form id="profileForm" class="form">
+      <label>نام</label>
+      <input type="text" id="profileName" required>
+      <label>ایمیل</label>
+      <input type="email" id="profileEmail" disabled>
+      <hr class="divider">
+      <p class="hint" style="text-align:right;margin:0 0 4px">برای تغییر رمز عبور (اختیاری):</p>
+      <label>رمز فعلی</label>
+      <input type="password" id="profileCurrentPass" placeholder="فقط برای تغییر رمز">
+      <label>رمز جدید</label>
+      <input type="password" id="profileNewPass" placeholder="حداقل ۶ کاراکتر">
+      <button type="submit" class="btn-primary">ذخیره تغییرات</button>
+    </form>
+  </section>
+
+  <section id="commentsPage" class="page">
+    <header class="header">
+      <button class="back-inline" data-nav="playerPage">→ بازگشت به پلیر</button>
+    </header>
+    <div class="title-row"><h2>نظرات <span id="commentsSongTitle"></span></h2></div>
+
+    <form id="commentForm" class="form comment-form">
+      <textarea id="commentText" rows="3" maxlength="500" placeholder="نظرت رو درباره این آهنگ بنویس..." required></textarea>
+      <button type="submit" class="btn-primary">ثبت نظر</button>
+    </form>
+    <p id="commentLoginHint" class="hint hidden">برای ثبت نظر باید وارد حساب شوید.</p>
+
+    <div id="commentsList" class="comments-list"></div>
+  </section>
+
+  <div id="miniPlayer" class="mini hidden">
+    <img id="miniCover" src="assets/cover1.jpg" alt="">
+    <div class="mini-info">
+      <b id="miniTitle">Bsdky music</b>
+      <small id="miniArtist">Disclosure</small>
+      <div class="mini-line"><i id="miniProgress"></i></div>
+    </div>
+    <button id="miniPlay">▶</button>
+  </div>
+</main>
+
+<div id="toast" class="toast"></div>
+<script src="app.js"></script>
+</body>
+                                                                                                                    </html>
