@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>پنل مدیریت | HBC REMIX</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin-body">
+
+<section id="adminLoginPage" class="admin-wrap">
+  <div class="admin-card">
+    <div class="logo">HBC <span>REMIX</span></div>
+    <h2>ورود پنل مدیریت</h2>
+    <form id="adminLoginForm" class="form">
+      <label>نام کاربری</label>
+      <input type="text" id="adminUsername" required>
+      <label>رمز عبور</label>
+      <input type="password" id="adminPassword" required>
+      <button type="submit" class="btn-primary">ورود</button>
+    </form>
+  </div>
+</section>
+
+<section id="adminDashboard" class="admin-wrap hidden">
+  <header class="admin-header">
+    <div class="logo">HBC <span>REMIX</span> <small>پنل مدیریت</small></div>
+    <button id="adminLogout" class="btn-ghost">خروج</button>
+  </header>
+
+  <div class="stats" id="statsBox"></div>
+
+  <div class="admin-card">
+    <h2>آپلود آهنگ جدید</h2>
+    <form id="uploadForm" class="form">
+      <label>عنوان آهنگ</label>
+      <input type="text" id="upTitle" required>
+      <label>نام خواننده</label>
+      <input type="text" id="upArtist" required>
+      <label>مدت زمان (مثلاً 03:20)</label>
+      <input type="text" id="upTime" placeholder="03:20">
+      <label>فایل کاور (عکس)</label>
+      <input type="file" id="upCover" accept="image/*" required>
+      <label>فایل آهنگ (mp3)</label>
+      <input type="file" id="upAudio" accept="audio/*" required>
+      <button type="submit" class="btn-primary" id="uploadBtn">آپلود آهنگ</button>
+    </form>
+    <div id="uploadProgress" class="hint hidden">در حال آپلود... چند لحظه صبر کن</div>
+  </div>
+
+  <div class="admin-card">
+    <h2>مدیریت آهنگ‌ها</h2>
+    <div id="adminSongs" class="admin-songs"></div>
+  </div>
+</section>
+
+<div id="toast" class="toast"></div>
+<script src="admin.js"></script>
+</body>
+</html>
