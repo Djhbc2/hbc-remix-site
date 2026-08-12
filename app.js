@@ -1,3 +1,4 @@
+// ⚠️ این آدرس را بعد از دیپلوی بک‌اند روی Render با آدرس واقعی جایگزین کن
 const API_BASE = "https://hbc-remix-backend.onrender.com/api";
 
 const $ = (id) => document.getElementById(id);
@@ -9,6 +10,7 @@ let playing = false;
 let token = localStorage.getItem("hbc_token") || null;
 let currentUser = JSON.parse(localStorage.getItem("hbc_user") || "null");
 
+// ---------- کمک‌کننده‌ها ----------
 function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
@@ -36,6 +38,7 @@ async function api(path, options = {}) {
   return data;
 }
 
+// ---------- بارگذاری آهنگ‌ها از سرور ----------
 let currentSort = "newest";
 
 async function loadSongs(sort = currentSort) {
@@ -78,11 +81,13 @@ function escapeHtml(str = "") {
   return str.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// ---------- پلیر ----------
 function setSong(i) {
   if (!songs.length) return;
   current = (i + songs.length) % songs.length;
   const s = songs[current];
   $("playerCover").src = s.cover;
+  $("bgCover").src = s.cover;
   $("playerTitle").textContent = s.title;
   $("playerArtist").textContent = s.artist;
   $("total").textContent = s.time;
@@ -116,7 +121,8 @@ function togglePlay() {
 }
 
 function updateButtons() {
-  $("play").textContent = playing ? "Ⅱ" : "▶";
+  $("iconPlay").classList.toggle("hidden", playing);
+  $("iconPause").classList.toggle("hidden", !playing);
   $("miniPlay").textContent = playing ? "Ⅱ" : "▶";
 }
 
@@ -188,15 +194,16 @@ $("repeat").onclick = () => {
   toast(audio.loop ? "تکرار آهنگ فعال شد" : "تکرار آهنگ غیرفعال شد");
 };
 
+// ---------- سیو کردن آهنگ (لایک / پلی‌لیست) ----------
 async function updateLikeIcon() {
   if (!songs.length) return;
   const s = songs[current];
   if (!token || !currentUser) {
-    $("likeBtn").textContent = "♡";
+    $("likeBtn").classList.remove("active");
     return;
   }
   const saved = (currentUser.savedSongs || []).includes(s._id);
-  $("likeBtn").textContent = saved ? "♥" : "♡";
+  $("likeBtn").classList.toggle("active", saved);
 }
 
 $("likeBtn").onclick = async () => {
@@ -212,13 +219,14 @@ $("likeBtn").onclick = async () => {
     if (data.saved) currentUser.savedSongs.push(s._id);
     else currentUser.savedSongs = currentUser.savedSongs.filter((id) => id !== s._id);
     localStorage.setItem("hbc_user", JSON.stringify(currentUser));
-    $("likeBtn").textContent = data.saved ? "♥" : "♡";
+    $("likeBtn").classList.toggle("active", data.saved);
     toast(data.saved ? "به پلی‌لیست اضافه شد" : "از پلی‌لیست حذف شد");
   } catch (e) {
     toast(e.message);
   }
 };
 
+// ---------- ناوبری بین صفحات ----------
 function navigate(pageId) {
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
   $(pageId).classList.add("active");
@@ -229,6 +237,7 @@ function navigate(pageId) {
   if (pageId === "profilePage") loadProfile();
 }
 
+// ---------- پروفایل کاربری ----------
 function loadProfile() {
   if (!currentUser) {
     navigate("authPage");
@@ -266,6 +275,7 @@ document.querySelectorAll("[data-nav]").forEach((btn) => {
   btn.addEventListener("click", () => navigate(btn.dataset.nav));
 });
 
+// ---------- منوی همبرگری ----------
 function openDrawer() {
   $("drawer").classList.add("open");
   $("overlay").classList.add("show");
@@ -304,6 +314,7 @@ $("logoutBtn").onclick = () => {
   navigate("songsPage");
 };
 
+// ---------- ثبت‌نام / ورود ----------
 $("tabLogin").onclick = () => {
   $("tabLogin").classList.add("active");
   $("tabSignup").classList.remove("active");
@@ -359,6 +370,7 @@ function onAuthSuccess(data) {
   navigate("songsPage");
 }
 
+// ---------- پلی‌لیست من ----------
 async function loadPlaylist() {
   if (!token) {
     $("playlistSongs").innerHTML = "";
@@ -390,6 +402,7 @@ async function loadPlaylist() {
   }
 }
 
+// ---------- نظرات ----------
 async function loadComments() {
   if (!songs.length) return;
   const s = songs[current];
@@ -429,5 +442,21 @@ $("commentForm").onsubmit = async (e) => {
   }
 };
 
+// ---------- پنجره خوش‌آمد ----------
+const welcomeBtn = document.getElementById("welcomeBtn");
+if (welcomeBtn) {
+  welcomeBtn.onclick = () => $("welcomeOverlay").classList.add("hide");
+}
+
+// ---------- انیمیشن لمس دکمه‌های دایره‌ای ----------
+document.querySelectorAll(".dock-controls button,.icon-btn-sm,.dock-nav button,.icon-circle,.like-inline,.menu").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    btn.classList.remove("pop-anim");
+    void btn.offsetWidth;
+    btn.classList.add("pop-anim");
+  });
+});
+
+// ---------- شروع ----------
 refreshDrawerUser();
 loadSongs();
