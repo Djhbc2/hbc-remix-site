@@ -1,4 +1,4 @@
-const CACHE_NAME = "hbc-remix-v1";
+const CACHE_NAME = "hbc-remix-v3";
 
 const FILES_TO_CACHE = [
   "./",
