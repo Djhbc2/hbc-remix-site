@@ -105,6 +105,9 @@ function openPlayer(i) {
   setSong(i);
   navigate("playerPage");
   $("miniPlayer").classList.add("hidden");
+  playing = true;
+  audio.play().catch(() => {});
+  updateButtons();
   api(`/songs/${songs[current]._id}/play`, { method: "POST" }).catch(() => {});
 }
 
@@ -441,6 +444,25 @@ $("commentForm").onsubmit = async (e) => {
     toast(e.message);
   }
 };
+
+// ---------- درباره ریمیکس ----------
+const aboutNavBtn = document.getElementById("aboutNavBtn");
+if (aboutNavBtn) {
+  aboutNavBtn.onclick = async () => {
+    closeDrawer();
+    $("aboutOverlay").classList.remove("hide");
+    try {
+      const data = await api("/settings/about");
+      $("aboutText").textContent = data.text || "توضیحی ثبت نشده است.";
+    } catch (e) {
+      $("aboutText").textContent = "خطا در دریافت اطلاعات.";
+    }
+  };
+}
+const aboutCloseBtn = document.getElementById("aboutCloseBtn");
+if (aboutCloseBtn) {
+  aboutCloseBtn.onclick = () => $("aboutOverlay").classList.add("hide");
+}
 
 // ---------- پنجره خوش‌آمد ----------
 const welcomeBtn = document.getElementById("welcomeBtn");

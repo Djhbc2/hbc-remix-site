@@ -23,6 +23,17 @@
 .admin-song-info b{display:block;font-size:13px}
 .admin-song-info small{color:var(--muted);font-size:11px}
 
+.admin-comments{display:flex;flex-direction:column;gap:14px}
+.admin-comment{background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:12px 14px}
+.admin-comment-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.admin-comment-head b{color:var(--orange);font-size:13px}
+.admin-comment-head small{color:var(--muted);font-size:10px}
+.admin-comment-text{
+ width:100%;background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:10px;
+ padding:8px 10px;color:#fff;font-family:inherit;font-size:12.5px;resize:vertical;min-height:50px
+}
+.admin-comment-actions{display:flex;gap:8px;margin-top:8px}
+
 @media(max-width:390px){
  .stats{grid-template-columns:repeat(2,1fr)}
 }

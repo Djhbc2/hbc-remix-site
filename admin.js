@@ -1,3 +1,4 @@
+// ⚠️ باید دقیقاً با app.js یکی باشد
 const API_BASE = "https://hbc-remix-backend.onrender.com/api";
 
 const $ = (id) => document.getElementById(id);
@@ -31,6 +32,7 @@ async function apiJson(path, options = {}) {
   return data;
 }
 
+// ---------- ورود مدیر ----------
 $("adminLoginForm").onsubmit = async (e) => {
   e.preventDefault();
   try {
@@ -62,8 +64,30 @@ function onLoggedIn() {
   show("dashboard");
   loadStats();
   loadAdminSongs();
+  loadAbout();
+  loadAdminComments();
 }
 
+// ---------- درباره ریمیکس ----------
+async function loadAbout() {
+  try {
+    const res = await fetch(API_BASE + "/settings/about");
+    const data = await res.json();
+    $("aboutTextarea").value = data.text || "";
+  } catch (e) {}
+}
+
+$("aboutForm").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await apiJson("/settings/about", { method: "PUT", body: { text: $("aboutTextarea").value } });
+    toast("متن ذخیره شد");
+  } catch (err) {
+    toast(err.message);
+  }
+};
+
+// ---------- آمار ----------
 async function loadStats() {
   try {
     const s = await apiJson("/admin/stats");
@@ -78,6 +102,7 @@ async function loadStats() {
   }
 }
 
+// ---------- آپلود آهنگ ----------
 $("uploadForm").onsubmit = async (e) => {
   e.preventDefault();
   const fd = new FormData();
@@ -109,6 +134,7 @@ $("uploadForm").onsubmit = async (e) => {
   }
 };
 
+// ---------- لیست و حذف آهنگ‌ها ----------
 async function loadAdminSongs() {
   try {
     const songs = await apiJson("/songs");
@@ -148,5 +174,69 @@ function escapeHtml(str = "") {
   return str.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// ---------- مدیریت نظرات ----------
+async function loadAdminComments() {
+  try {
+    const comments = await apiJson("/admin/comments");
+    $("adminComments").innerHTML = comments.length
+      ? comments
+          .map(
+            (c) => `<div class="admin-comment" data-id="${c._id}">
+        <div class="admin-comment-head">
+          <b>${escapeHtml(c.name)}</b>
+          <small>روی «${escapeHtml(c.songTitle)}»</small>
+        </div>
+        <textarea class="admin-comment-text">${escapeHtml(c.text)}</textarea>
+        <div class="admin-comment-actions">
+          <button class="btn-ghost save-comment">ذخیره ویرایش</button>
+          <button class="btn-danger delete-comment">حذف</button>
+        </div>
+      </div>`
+          )
+          .join("")
+      : `<p class="hint">هنوز نظری ثبت نشده.</p>`;
+
+    document.querySelectorAll(".save-comment").forEach((btn) => {
+      btn.onclick = () => {
+        const wrap = btn.closest(".admin-comment");
+        const id = wrap.dataset.id;
+        const text = wrap.querySelector(".admin-comment-text").value;
+        saveComment(id, text);
+      };
+    });
+    document.querySelectorAll(".delete-comment").forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.closest(".admin-comment").dataset.id;
+        deleteComment(id);
+      };
+    });
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function saveComment(id, text) {
+  try {
+    await apiJson(`/admin/comments/${id}`, { method: "PUT", body: { text } });
+    toast("نظر ویرایش شد");
+    loadAdminComments();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function deleteComment(id) {
+  if (!confirm("مطمئنی می‌خوای این نظر حذف بشه؟")) return;
+  try {
+    await apiJson(`/admin/comments/${id}`, { method: "DELETE" });
+    toast("نظر حذف شد");
+    loadAdminComments();
+    loadStats();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+// ---------- شروع ----------
 if (adminToken) onLoggedIn();
 else show("login");

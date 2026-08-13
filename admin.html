@@ -12,7 +12,7 @@
 <!-- ورود مدیر -->
 <section id="adminLoginPage" class="admin-wrap">
   <div class="admin-card">
-    <img class="logo" style="margin:0 auto" src="/logo.png" alt="HBC REMIX">
+    <img class="logo" style="margin:0 auto" src="assets/logo.png" alt="HBC REMIX">
     <h2>ورود پنل مدیریت</h2>
     <form id="adminLoginForm" class="form">
       <label>نام کاربری</label>
@@ -27,11 +27,19 @@
 <!-- داشبورد -->
 <section id="adminDashboard" class="admin-wrap hidden">
   <header class="admin-header">
-    <div style="display:flex;align-items:center;gap:10px"><img class="logo" style="height:30px" src="/logo.png" alt=""><small style="color:var(--muted)">پنل مدیریت</small></div>
+    <div style="display:flex;align-items:center;gap:10px"><img class="logo" style="height:30px" src="assets/logo.png" alt=""><small style="color:var(--muted)">پنل مدیریت</small></div>
     <button id="adminLogout" class="btn-ghost">خروج</button>
   </header>
 
   <div class="stats" id="statsBox"></div>
+
+  <div class="admin-card">
+    <h2>درباره ریمیکس (نمایش برای کاربران)</h2>
+    <form id="aboutForm" class="form">
+      <textarea id="aboutTextarea" rows="5" placeholder="متن معرفی ریمیکس..."></textarea>
+      <button type="submit" class="btn-primary">ذخیره متن</button>
+    </form>
+  </div>
 
   <div class="admin-card">
     <h2>آپلود آهنگ جدید</h2>
@@ -54,6 +62,11 @@
   <div class="admin-card">
     <h2>مدیریت آهنگ‌ها</h2>
     <div id="adminSongs" class="admin-songs"></div>
+  </div>
+
+  <div class="admin-card">
+    <h2>مدیریت نظرات</h2>
+    <div id="adminComments" class="admin-comments"></div>
   </div>
 </section>
 
