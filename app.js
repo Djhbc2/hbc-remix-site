@@ -7,6 +7,7 @@ const audio = $("audio");
 let songs = [];
 let current = 0;
 let playing = false;
+let playPositions = {}; // یادآوری محل توقف هر آهنگ (برای ادامه‌ی پخش)
 let token = localStorage.getItem("hbc_token") || null;
 let currentUser = JSON.parse(localStorage.getItem("hbc_user") || "null");
 
@@ -75,6 +76,28 @@ function renderSongs() {
     )
     .join("");
   document.querySelectorAll("#songs .song").forEach((x) => (x.onclick = () => openPlayer(+x.dataset.index)));
+  updateNowPlayingBadge();
+}
+
+// نمایش نشانگر «در حال پخش» (اکولایزر) کنار آهنگ فعال تو لیست
+function updateNowPlayingBadge() {
+  document.querySelectorAll(".song").forEach((el) => {
+    const idx = +el.dataset.index;
+    const isCurrent = songs.length > 0 && idx === current;
+    el.classList.toggle("now-playing", isCurrent);
+    let badge = el.querySelector(".eq-badge");
+    if (isCurrent) {
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "eq-badge";
+        badge.innerHTML = "<i></i><i></i><i></i>";
+        el.querySelector("b")?.after(badge);
+      }
+      badge.classList.toggle("paused", !playing);
+    } else if (badge) {
+      badge.remove();
+    }
+  });
 }
 
 function escapeHtml(str = "") {
@@ -84,6 +107,9 @@ function escapeHtml(str = "") {
 // ---------- پلیر ----------
 function setSong(i) {
   if (!songs.length) return;
+  // قبل از عوض کردن آهنگ، محل فعلی رو ذخیره کن
+  if (songs[current]) playPositions[songs[current]._id] = audio.currentTime || 0;
+
   current = (i + songs.length) % songs.length;
   const s = songs[current];
   $("playerCover").src = s.cover;
@@ -97,8 +123,17 @@ function setSong(i) {
   $("seek").value = 0;
   $("miniProgress").style.width = "0%";
   audio.src = s.src;
+
+  const resumeAt = playPositions[s._id] || 0;
+  const onReady = () => {
+    if (resumeAt > 0 && resumeAt < audio.duration - 1) audio.currentTime = resumeAt;
+    audio.removeEventListener("loadedmetadata", onReady);
+  };
+  audio.addEventListener("loadedmetadata", onReady);
+
   if (playing) audio.play();
   updateLikeIcon();
+  updateNowPlayingBadge();
 }
 
 function openPlayer(i) {
@@ -127,6 +162,7 @@ function updateButtons() {
   $("iconPlay").classList.toggle("hidden", playing);
   $("iconPause").classList.toggle("hidden", !playing);
   $("miniPlay").textContent = playing ? "Ⅱ" : "▶";
+  updateNowPlayingBadge();
 }
 
 function next() {
@@ -156,8 +192,12 @@ audio.ontimeupdate = () => {
   $("seek").value = p;
   $("miniProgress").style.width = p + "%";
   $("current").textContent = new Date(audio.currentTime * 1000).toISOString().slice(14, 19);
+  if (songs[current]) playPositions[songs[current]._id] = audio.currentTime;
 };
-audio.onended = next;
+audio.onended = () => {
+  if (songs[current]) delete playPositions[songs[current]._id];
+  next();
+};
 
 $("download").onclick = async () => {
   if (!songs.length) return;
@@ -400,6 +440,7 @@ async function loadPlaylist() {
         if (i >= 0) openPlayer(i);
       };
     });
+    updateNowPlayingBadge();
   } catch (e) {
     toast(e.message);
   }
