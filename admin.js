@@ -66,6 +66,7 @@ function onLoggedIn() {
   loadAdminSongs();
   loadAbout();
   loadAdminComments();
+  loadDjProfile();
 }
 
 // ---------- درباره ریمیکس ----------
@@ -82,6 +83,36 @@ $("aboutForm").onsubmit = async (e) => {
   try {
     await apiJson("/settings/about", { method: "PUT", body: { text: $("aboutTextarea").value } });
     toast("متن ذخیره شد");
+  } catch (err) {
+    toast(err.message);
+  }
+};
+
+// ---------- پروفایل عمومی DJ ----------
+async function loadDjProfile() {
+  try {
+    const res = await fetch(API_BASE + "/settings/dj-profile");
+    const data = await res.json();
+    $("djBioInput").value = data.bio || "";
+    $("djPhotoInput").value = data.photo || "";
+    $("djInstagramInput").value = data.instagram || "";
+    $("djTelegramInput").value = data.telegram || "";
+  } catch (e) {}
+}
+
+$("djProfileForm").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    await apiJson("/settings/dj-profile", {
+      method: "PUT",
+      body: {
+        bio: $("djBioInput").value,
+        photo: $("djPhotoInput").value,
+        instagram: $("djInstagramInput").value,
+        telegram: $("djTelegramInput").value,
+      },
+    });
+    toast("پروفایل ذخیره شد");
   } catch (err) {
     toast(err.message);
   }

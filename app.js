@@ -52,6 +52,8 @@ async function loadSongs(sort = currentSort) {
   }
   renderSongs();
   if (songs.length) setSong(0);
+  checkNewSongsBadge();
+  openSharedSongIfAny();
 }
 
 document.querySelectorAll(".sort-tab").forEach((btn) => {
@@ -144,6 +146,7 @@ function openPlayer(i) {
   audio.play().catch(() => {});
   updateButtons();
   api(`/songs/${songs[current]._id}/play`, { method: "POST" }).catch(() => {});
+  loadRating();
 }
 
 function togglePlay() {
@@ -168,11 +171,76 @@ function updateButtons() {
 function next() {
   setSong(current + 1);
   if (playing) audio.play();
+  loadRating();
 }
 function prev() {
   setSong(current - 1);
   if (playing) audio.play();
+  loadRating();
 }
+
+// ---------- امتیازدهی ستاره‌ای ----------
+function renderStars(myRating) {
+  document.querySelectorAll(".star").forEach((s) => {
+    s.classList.toggle("filled", +s.dataset.value <= myRating);
+  });
+}
+
+async function loadRating() {
+  if (!songs.length) return;
+  const s = songs[current];
+  $("ratingInfo").textContent = s.ratingCount
+    ? `${(s.ratingSum / s.ratingCount).toFixed(1)} از ${s.ratingCount} رای`
+    : "بدون امتیاز";
+  renderStars(0);
+  if (!token) return;
+  try {
+    const data = await api(`/songs/${s._id}/rate/mine`);
+    renderStars(data.myRating || 0);
+  } catch (e) {}
+}
+
+document.querySelectorAll(".star").forEach((star) => {
+  star.onclick = async () => {
+    if (!token) {
+      toast("برای امتیازدهی ابتدا وارد حساب شوید");
+      navigate("authPage");
+      return;
+    }
+    const value = +star.dataset.value;
+    const s = songs[current];
+    try {
+      const data = await api(`/songs/${s._id}/rate`, { method: "POST", body: { value } });
+      s.ratingSum = data.ratingAvg * data.ratingCount;
+      s.ratingCount = data.ratingCount;
+      $("ratingInfo").textContent = `${data.ratingAvg} از ${data.ratingCount} رای`;
+      renderStars(value);
+      toast("امتیازت ثبت شد");
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+});
+
+// ---------- اشتراک‌گذاری آهنگ ----------
+$("shareBtn").onclick = async () => {
+  if (!songs.length) return;
+  const s = songs[current];
+  const url = `${location.origin}${location.pathname}?song=${s._id}`;
+  const shareData = { title: s.title, text: `آهنگ «${s.title}» رو تو HBC REMIX گوش کن 🎧`, url };
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+    } catch (e) {}
+  } else {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("لینک آهنگ کپی شد");
+    } catch (e) {
+      toast("کپی نشد، لینک: " + url);
+    }
+  }
+};
 
 $("backBtn").onclick = () => navigate("songsPage");
 $("play").onclick = togglePlay;
@@ -278,7 +346,20 @@ function navigate(pageId) {
   if (pageId === "playlistPage") loadPlaylist();
   if (pageId === "commentsPage") loadComments();
   if (pageId === "profilePage") loadProfile();
+  if (pageId === "chartPage") loadChart();
+
+  // مینی‌پلیر: وقتی از صفحه پلیر خارج می‌شیم ولی آهنگی بارگذاری شده، نشونش بده تا پخش پس‌زمینه ادامه پیدا کنه
+  if (pageId !== "playerPage" && songs.length && audio.src) {
+    $("miniPlayer").classList.remove("hidden");
+  } else if (pageId === "playerPage") {
+    $("miniPlayer").classList.add("hidden");
+  }
 }
+
+$("miniPlayer").onclick = (e) => {
+  if (e.target.id === "miniPlay") return;
+  navigate("playerPage");
+};
 
 // ---------- پروفایل کاربری ----------
 function loadProfile() {
@@ -461,11 +542,34 @@ async function loadComments() {
             (c) => `<div class="comment">
         <b>${escapeHtml(c.name)}</b>
         <p>${escapeHtml(c.text)}</p>
-        <small>${new Date(c.createdAt).toLocaleDateString("fa-IR")}</small>
+        <div class="comment-foot">
+          <small>${new Date(c.createdAt).toLocaleDateString("fa-IR")}</small>
+          <button class="comment-like" data-id="${c._id}">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.4-9.3-8.8C1.2 8 2.6 4.8 5.7 4.1 7.9 3.6 10 4.6 12 7c2-2.4 4.1-3.4 6.3-2.9 3.1.7 4.5 3.9 3 6.1C19 15.6 12 20 12 20z" stroke="currentColor" stroke-width="1.8"/></svg>
+            <span>${c.likeCount || 0}</span>
+          </button>
+        </div>
       </div>`
           )
           .join("")
       : `<p class="empty">هنوز نظری ثبت نشده. اولین نفر باش!</p>`;
+
+    document.querySelectorAll(".comment-like").forEach((btn) => {
+      btn.onclick = async () => {
+        if (!token) {
+          toast("برای لایک ابتدا وارد حساب شوید");
+          navigate("authPage");
+          return;
+        }
+        try {
+          const data = await api(`/comments/${s._id}/${btn.dataset.id}/like`, { method: "POST" });
+          btn.querySelector("span").textContent = data.likeCount;
+          btn.classList.toggle("liked", data.liked);
+        } catch (e) {
+          toast(e.message);
+        }
+      };
+    });
   } catch (e) {
     toast(e.message);
   }
@@ -503,6 +607,90 @@ if (aboutNavBtn) {
 const aboutCloseBtn = document.getElementById("aboutCloseBtn");
 if (aboutCloseBtn) {
   aboutCloseBtn.onclick = () => $("aboutOverlay").classList.add("hide");
+}
+
+// ---------- پرطرفدارترین‌ها (نمودار) ----------
+async function loadChart() {
+  try {
+    const list = await api("/songs/top/chart");
+    const max = Math.max(...list.map((s) => s.downloads + s.plays), 1);
+    $("chartList").innerHTML = list.length
+      ? list
+          .map((s, i) => {
+            const score = s.downloads + s.plays;
+            const pct = Math.round((score / max) * 100);
+            return `<div class="chart-item">
+          <span class="chart-rank">${i + 1}</span>
+          <img src="${s.cover}" alt="">
+          <div class="chart-info">
+            <b>${escapeHtml(s.title)}</b>
+            <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%"></div></div>
+            <div class="chart-count">${s.plays} پخش • ${s.downloads} دانلود</div>
+          </div>
+        </div>`;
+          })
+          .join("")
+      : `<p class="empty">هنوز آماری ثبت نشده.</p>`;
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+// ---------- پروفایل عمومی DJ ----------
+const djProfileNavBtn = document.getElementById("djProfileNavBtn");
+if (djProfileNavBtn) {
+  djProfileNavBtn.onclick = async () => {
+    closeDrawer();
+    $("djProfileOverlay").classList.remove("hide");
+    try {
+      const data = await api("/settings/dj-profile");
+      $("djBio").textContent = data.bio || "توضیحی ثبت نشده است.";
+      $("djPhoto").src = data.photo || "logo.png";
+      if (data.instagram) {
+        $("djInstagram").href = data.instagram;
+        $("djInstagram").classList.remove("hidden");
+      }
+      if (data.telegram) {
+        $("djTelegram").href = data.telegram;
+        $("djTelegram").classList.remove("hidden");
+      }
+    } catch (e) {
+      $("djBio").textContent = "خطا در دریافت اطلاعات.";
+    }
+  };
+}
+const djProfileCloseBtn = document.getElementById("djProfileCloseBtn");
+if (djProfileCloseBtn) {
+  djProfileCloseBtn.onclick = () => $("djProfileOverlay").classList.add("hide");
+}
+
+// ---------- نشان آهنگ جدید ----------
+function checkNewSongsBadge() {
+  if (!songs.length) return;
+  const newestCreatedAt = songs.reduce((max, s) => (s.createdAt > max ? s.createdAt : max), songs[0].createdAt);
+  const lastSeen = localStorage.getItem("hbc_last_seen_song") || "";
+  if (newestCreatedAt > lastSeen) {
+    $("newBadge").classList.remove("hidden");
+  }
+}
+const songsNavBtn = document.getElementById("songsNavBtn");
+if (songsNavBtn) {
+  songsNavBtn.addEventListener("click", () => {
+    if (songs.length) {
+      const newestCreatedAt = songs.reduce((max, s) => (s.createdAt > max ? s.createdAt : max), songs[0].createdAt);
+      localStorage.setItem("hbc_last_seen_song", newestCreatedAt);
+    }
+    $("newBadge").classList.add("hidden");
+  });
+}
+
+// ---------- باز کردن مستقیم آهنگ از لینک اشتراک‌گذاری‌شده (?song=ID) ----------
+function openSharedSongIfAny() {
+  const params = new URLSearchParams(location.search);
+  const songId = params.get("song");
+  if (!songId) return;
+  const idx = songs.findIndex((s) => s._id === songId);
+  if (idx >= 0) openPlayer(idx);
 }
 
 // ---------- پنجره خوش‌آمد ----------
