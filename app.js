@@ -693,6 +693,73 @@ function openSharedSongIfAny() {
   if (idx >= 0) openPlayer(idx);
 }
 
+// ---------- اعلان آهنگ جدید (Push Notification) ----------
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+async function updateNotifyBtnLabel() {
+  const btn = document.getElementById("notifyBtn");
+  if (!btn) return;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    btn.textContent = "🔔 مرورگرت از اعلان پشتیبانی نمی‌کنه";
+    btn.disabled = true;
+    return;
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    btn.textContent = sub ? "🔕 غیرفعال کردن اعلان آهنگ جدید" : "🔔 فعال کردن اعلان آهنگ جدید";
+  } catch (e) {}
+}
+
+async function initPush() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  try {
+    await navigator.serviceWorker.register("sw.js");
+    updateNotifyBtnLabel();
+  } catch (e) {}
+}
+
+const notifyBtn = document.getElementById("notifyBtn");
+if (notifyBtn) {
+  notifyBtn.onclick = async () => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      toast("مرورگرت از اعلان پشتیبانی نمی‌کنه");
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+
+      if (existing) {
+        await api("/push/unsubscribe", { method: "POST", body: { endpoint: existing.endpoint } });
+        await existing.unsubscribe();
+        toast("اعلان آهنگ جدید غیرفعال شد");
+      } else {
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          toast("اجازه‌ی نمایش اعلان داده نشد");
+          return;
+        }
+        const { key } = await api("/push/vapid-public-key");
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(key),
+        });
+        await api("/push/subscribe", { method: "POST", body: sub.toJSON() });
+        toast("اعلان آهنگ جدید فعال شد 🎉");
+      }
+      updateNotifyBtnLabel();
+    } catch (e) {
+      toast("خطا در تنظیم اعلان");
+    }
+  };
+}
+
 // ---------- پنجره خوش‌آمد ----------
 const welcomeBtn = document.getElementById("welcomeBtn");
 if (welcomeBtn) {
@@ -711,3 +778,4 @@ document.querySelectorAll(".dock-controls button,.icon-btn-sm,.dock-nav button,.
 // ---------- شروع ----------
 refreshDrawerUser();
 loadSongs();
+initPush();
