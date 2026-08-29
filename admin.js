@@ -171,19 +171,68 @@ async function loadAdminSongs() {
     const songs = await apiJson("/songs");
     $("adminSongs").innerHTML = songs
       .map(
-        (s) => `<div class="admin-song">
-        <img src="${s.cover}">
-        <div class="admin-song-info">
-          <b>${escapeHtml(s.title)}</b>
-          <small>${escapeHtml(s.artist)} • ${s.downloads || 0} دانلود</small>
+        (s) => `<div class="admin-song" data-id="${s._id}">
+        <div class="admin-song-view">
+          <img src="${s.cover}">
+          <div class="admin-song-info">
+            <b>${escapeHtml(s.title)}</b>
+            <small>${escapeHtml(s.artist)} • ${s.time} • ${s.downloads || 0} دانلود</small>
+          </div>
+          <button class="btn-ghost edit-song" data-id="${s._id}">ویرایش</button>
+          <button class="btn-danger" data-id="${s._id}">حذف</button>
         </div>
-        <button class="btn-danger" data-id="${s._id}">حذف</button>
+        <div class="admin-song-edit hidden">
+          <label>عنوان آهنگ</label>
+          <input type="text" class="edit-title" value="${escapeHtml(s.title)}">
+          <label>نام خواننده</label>
+          <input type="text" class="edit-artist" value="${escapeHtml(s.artist)}">
+          <label>مدت زمان</label>
+          <input type="text" class="edit-time" value="${escapeHtml(s.time)}">
+          <div class="admin-song-edit-actions">
+            <button class="btn-primary save-song" data-id="${s._id}">ذخیره</button>
+            <button class="btn-ghost cancel-edit">انصراف</button>
+          </div>
+        </div>
       </div>`
       )
       .join("");
+
     document.querySelectorAll(".btn-danger").forEach((btn) => {
       btn.onclick = () => deleteSong(btn.dataset.id);
     });
+    document.querySelectorAll(".edit-song").forEach((btn) => {
+      btn.onclick = () => {
+        const wrap = btn.closest(".admin-song");
+        wrap.querySelector(".admin-song-view").classList.add("hidden");
+        wrap.querySelector(".admin-song-edit").classList.remove("hidden");
+      };
+    });
+    document.querySelectorAll(".cancel-edit").forEach((btn) => {
+      btn.onclick = () => {
+        const wrap = btn.closest(".admin-song");
+        wrap.querySelector(".admin-song-edit").classList.add("hidden");
+        wrap.querySelector(".admin-song-view").classList.remove("hidden");
+      };
+    });
+    document.querySelectorAll(".save-song").forEach((btn) => {
+      btn.onclick = () => {
+        const wrap = btn.closest(".admin-song");
+        const title = wrap.querySelector(".edit-title").value;
+        const artist = wrap.querySelector(".edit-artist").value;
+        const time = wrap.querySelector(".edit-time").value;
+        saveSongEdit(btn.dataset.id, { title, artist, time });
+      };
+    });
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function saveSongEdit(id, body) {
+  try {
+    await apiJson(`/admin/songs/${id}`, { method: "PUT", body });
+    toast("آهنگ ویرایش شد");
+    loadAdminSongs();
   } catch (e) {
     toast(e.message);
   }
