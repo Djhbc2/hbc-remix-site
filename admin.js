@@ -1,5 +1,5 @@
 // ⚠️ باید دقیقاً با app.js یکی باشد
-const API_BASE = "https://hbc-remix-backend.onrender.com/api";
+const API_BASE = "https://api.djhbc.ir/api";
 
 const $ = (id) => document.getElementById(id);
 let adminToken = localStorage.getItem("hbc_admin_token") || null;

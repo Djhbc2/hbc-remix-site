@@ -1,5 +1,5 @@
 // ⚠️ این آدرس را بعد از دیپلوی بک‌اند روی Render با آدرس واقعی جایگزین کن
-const API_BASE = "https://hbc-remix-backend.onrender.com/api";
+const API_BASE = "https://api.djhbc.ir/api";
 
 const $ = (id) => document.getElementById(id);
 const audio = $("audio");
