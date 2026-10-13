@@ -1,17 +1,25 @@
 // ⚠️ این آدرس را بعد از دیپلوی بک‌اند روی Render با آدرس واقعی جایگزین کن
+
 const API_BASE = "https://api.djhbc.ir/api";
 
 const $ = (id) => document.getElementById(id);
+
 const audio = $("audio");
 
 let songs = [];
+
 let current = 0;
+
 let playing = false;
+
 let playPositions = {}; // یادآوری محل توقف هر آهنگ (برای ادامه‌ی پخش)
+
 let token = localStorage.getItem("hbc_token") || null;
+
 let currentUser = JSON.parse(localStorage.getItem("hbc_user") || "null");
 
 // ---------- کمک‌کننده‌ها ----------
+
 function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
@@ -28,7 +36,8 @@ async function api(path, options = {}) {
   const res = await fetch(API_BASE + path, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      // فقط وقتی body داریم Content-Type می‌فرستیم تا برای GET درخواست preflight (OPTIONS) ساخته نشه
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...authHeaders(),
       ...(options.headers || {}),
     },
@@ -40,6 +49,7 @@ async function api(path, options = {}) {
 }
 
 // ---------- بارگذاری آهنگ‌ها از سرور ----------
+
 let currentSort = "newest";
 
 async function loadSongs(sort = currentSort) {
@@ -48,7 +58,8 @@ async function loadSongs(sort = currentSort) {
     songs = await api(`/songs?sort=${sort}`);
   } catch (e) {
     songs = [];
-    toast("اتصال به سرور برقرار نشد");
+    // متن خطای واقعی رو نشون می‌ده تا علت مشخص بشه
+    toast("خطا: " + e.message);
   }
   renderSongs();
   if (songs.length) setSong(0);
@@ -69,12 +80,12 @@ function renderSongs() {
   $("songs").innerHTML = songs
     .map(
       (s, i) => `
- <button class="song" data-index="${i}">
-   <img src="${s.cover}" alt="">
-   <div><b>${escapeHtml(s.title)}</b><small>${escapeHtml(s.artist)}</small></div>
-   <span class="time">${s.time}</span>
-   <span class="dots">•••</span>
- </button>`
+<button class="song" data-index="${i}">
+<img src="${s.cover}" alt="">
+<div><b>${escapeHtml(s.title)}</b><small>${escapeHtml(s.artist)}</small></div>
+<span class="time">${s.time}</span>
+<span class="dots">•••</span>
+</button>`
     )
     .join("");
   document.querySelectorAll("#songs .song").forEach((x) => (x.onclick = () => openPlayer(+x.dataset.index)));
@@ -107,11 +118,11 @@ function escapeHtml(str = "") {
 }
 
 // ---------- پلیر ----------
+
 function setSong(i) {
   if (!songs.length) return;
   // قبل از عوض کردن آهنگ، محل فعلی رو ذخیره کن
   if (songs[current]) playPositions[songs[current]._id] = audio.currentTime || 0;
-
   current = (i + songs.length) % songs.length;
   const s = songs[current];
   $("playerCover").src = s.cover;
@@ -125,14 +136,12 @@ function setSong(i) {
   $("seek").value = 0;
   $("miniProgress").style.width = "0%";
   audio.src = s.src;
-
   const resumeAt = playPositions[s._id] || 0;
   const onReady = () => {
     if (resumeAt > 0 && resumeAt < audio.duration - 1) audio.currentTime = resumeAt;
     audio.removeEventListener("loadedmetadata", onReady);
   };
   audio.addEventListener("loadedmetadata", onReady);
-
   if (playing) audio.play();
   updateLikeIcon();
   updateNowPlayingBadge();
@@ -173,6 +182,7 @@ function next() {
   if (playing) audio.play();
   loadRating();
 }
+
 function prev() {
   setSong(current - 1);
   if (playing) audio.play();
@@ -180,6 +190,7 @@ function prev() {
 }
 
 // ---------- امتیازدهی ستاره‌ای ----------
+
 function renderStars(myRating) {
   document.querySelectorAll(".star").forEach((s) => {
     s.classList.toggle("filled", +s.dataset.value <= myRating);
@@ -223,6 +234,7 @@ document.querySelectorAll(".star").forEach((star) => {
 });
 
 // ---------- اشتراک‌گذاری آهنگ ----------
+
 $("shareBtn").onclick = async () => {
   if (!songs.length) return;
   const s = songs[current];
@@ -262,6 +274,7 @@ audio.ontimeupdate = () => {
   $("current").textContent = new Date(audio.currentTime * 1000).toISOString().slice(14, 19);
   if (songs[current]) playPositions[songs[current]._id] = audio.currentTime;
 };
+
 audio.onended = () => {
   if (songs[current]) delete playPositions[songs[current]._id];
   next();
@@ -300,12 +313,14 @@ $("shuffle").onclick = () => {
   setSong(r);
   if (playing) audio.play();
 };
+
 $("repeat").onclick = () => {
   audio.loop = !audio.loop;
   toast(audio.loop ? "تکرار آهنگ فعال شد" : "تکرار آهنگ غیرفعال شد");
 };
 
 // ---------- سیو کردن آهنگ (لایک / پلی‌لیست) ----------
+
 async function updateLikeIcon() {
   if (!songs.length) return;
   const s = songs[current];
@@ -338,6 +353,7 @@ $("likeBtn").onclick = async () => {
 };
 
 // ---------- ناوبری بین صفحات ----------
+
 function navigate(pageId) {
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
   $(pageId).classList.add("active");
@@ -347,7 +363,6 @@ function navigate(pageId) {
   if (pageId === "commentsPage") loadComments();
   if (pageId === "profilePage") loadProfile();
   if (pageId === "chartPage") loadChart();
-
   // مینی‌پلیر: وقتی از صفحه پلیر خارج می‌شیم ولی آهنگی بارگذاری شده، نشونش بده تا پخش پس‌زمینه ادامه پیدا کنه
   if (pageId !== "playerPage" && songs.length && audio.src) {
     $("miniPlayer").classList.remove("hidden");
@@ -362,6 +377,7 @@ $("miniPlayer").onclick = (e) => {
 };
 
 // ---------- پروفایل کاربری ----------
+
 function loadProfile() {
   if (!currentUser) {
     navigate("authPage");
@@ -400,14 +416,17 @@ document.querySelectorAll("[data-nav]").forEach((btn) => {
 });
 
 // ---------- منوی همبرگری ----------
+
 function openDrawer() {
   $("drawer").classList.add("open");
   $("overlay").classList.add("show");
 }
+
 function closeDrawer() {
   $("drawer").classList.remove("open");
   $("overlay").classList.remove("show");
 }
+
 $("menuBtn").onclick = openDrawer;
 $("closeDrawer").onclick = closeDrawer;
 $("overlay").onclick = closeDrawer;
@@ -439,12 +458,14 @@ $("logoutBtn").onclick = () => {
 };
 
 // ---------- ثبت‌نام / ورود ----------
+
 $("tabLogin").onclick = () => {
   $("tabLogin").classList.add("active");
   $("tabSignup").classList.remove("active");
   $("loginForm").classList.remove("hidden");
   $("signupForm").classList.add("hidden");
 };
+
 $("tabSignup").onclick = () => {
   $("tabSignup").classList.add("active");
   $("tabLogin").classList.remove("active");
@@ -495,6 +516,7 @@ function onAuthSuccess(data) {
 }
 
 // ---------- پلی‌لیست من ----------
+
 async function loadPlaylist() {
   if (!token) {
     $("playlistSongs").innerHTML = "";
@@ -508,11 +530,11 @@ async function loadPlaylist() {
       .map((s) => {
         const idx = songs.findIndex((x) => x._id === s._id);
         return `<button class="song" data-index="${idx}">
-          <img src="${s.cover}" alt="">
-          <div><b>${escapeHtml(s.title)}</b><small>${escapeHtml(s.artist)}</small></div>
-          <span class="time">${s.time}</span>
-          <span class="dots">•••</span>
-        </button>`;
+<img src="${s.cover}" alt="">
+<div><b>${escapeHtml(s.title)}</b><small>${escapeHtml(s.artist)}</small></div>
+<span class="time">${s.time}</span>
+<span class="dots">•••</span>
+</button>`;
       })
       .join("");
     document.querySelectorAll("#playlistSongs .song").forEach((x) => {
@@ -528,6 +550,7 @@ async function loadPlaylist() {
 }
 
 // ---------- نظرات ----------
+
 async function loadComments() {
   if (!songs.length) return;
   const s = songs[current];
@@ -540,20 +563,19 @@ async function loadComments() {
       ? list
           .map(
             (c) => `<div class="comment">
-        <b>${escapeHtml(c.name)}</b>
-        <p>${escapeHtml(c.text)}</p>
-        <div class="comment-foot">
-          <small>${new Date(c.createdAt).toLocaleDateString("fa-IR")}</small>
-          <button class="comment-like" data-id="${c._id}">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.4-9.3-8.8C1.2 8 2.6 4.8 5.7 4.1 7.9 3.6 10 4.6 12 7c2-2.4 4.1-3.4 6.3-2.9 3.1.7 4.5 3.9 3 6.1C19 15.6 12 20 12 20z" stroke="currentColor" stroke-width="1.8"/></svg>
-            <span>${c.likeCount || 0}</span>
-          </button>
-        </div>
-      </div>`
+<b>${escapeHtml(c.name)}</b>
+<p>${escapeHtml(c.text)}</p>
+<div class="comment-foot">
+<small>${new Date(c.createdAt).toLocaleDateString("fa-IR")}</small>
+<button class="comment-like" data-id="${c._id}">
+<svg viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.4-9.3-8.8C1.2 8 2.6 4.8 5.7 4.1 7.9 3.6 10 4.6 12 7c2-2.4 4.1-3.4 6.3-2.9 3.1.7 4.5 3.9 3 6.1C19 15.6 12 20 12 20z" stroke="currentColor" stroke-width="1.8"/></svg>
+<span>${c.likeCount || 0}</span>
+</button>
+</div>
+</div>`
           )
           .join("")
       : `<p class="empty">هنوز نظری ثبت نشده. اولین نفر باش!</p>`;
-
     document.querySelectorAll(".comment-like").forEach((btn) => {
       btn.onclick = async () => {
         if (!token) {
@@ -591,6 +613,7 @@ $("commentForm").onsubmit = async (e) => {
 };
 
 // ---------- درباره ریمیکس ----------
+
 const aboutNavBtn = document.getElementById("aboutNavBtn");
 if (aboutNavBtn) {
   aboutNavBtn.onclick = async () => {
@@ -604,12 +627,14 @@ if (aboutNavBtn) {
     }
   };
 }
+
 const aboutCloseBtn = document.getElementById("aboutCloseBtn");
 if (aboutCloseBtn) {
   aboutCloseBtn.onclick = () => $("aboutOverlay").classList.add("hide");
 }
 
 // ---------- پرطرفدارترین‌ها (نمودار) ----------
+
 async function loadChart() {
   try {
     const list = await api("/songs/top/chart");
@@ -620,14 +645,14 @@ async function loadChart() {
             const score = s.downloads + s.plays;
             const pct = Math.round((score / max) * 100);
             return `<div class="chart-item">
-          <span class="chart-rank">${i + 1}</span>
-          <img src="${s.cover}" alt="">
-          <div class="chart-info">
-            <b>${escapeHtml(s.title)}</b>
-            <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%"></div></div>
-            <div class="chart-count">${s.plays} پخش • ${s.downloads} دانلود</div>
-          </div>
-        </div>`;
+<span class="chart-rank">${i + 1}</span>
+<img src="${s.cover}" alt="">
+<div class="chart-info">
+<b>${escapeHtml(s.title)}</b>
+<div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%"></div></div>
+<div class="chart-count">${s.plays} پخش • ${s.downloads} دانلود</div>
+</div>
+</div>`;
           })
           .join("")
       : `<p class="empty">هنوز آماری ثبت نشده.</p>`;
@@ -637,6 +662,7 @@ async function loadChart() {
 }
 
 // ---------- پروفایل عمومی DJ ----------
+
 const djProfileNavBtn = document.getElementById("djProfileNavBtn");
 if (djProfileNavBtn) {
   djProfileNavBtn.onclick = async () => {
@@ -659,12 +685,14 @@ if (djProfileNavBtn) {
     }
   };
 }
+
 const djProfileCloseBtn = document.getElementById("djProfileCloseBtn");
 if (djProfileCloseBtn) {
   djProfileCloseBtn.onclick = () => $("djProfileOverlay").classList.add("hide");
 }
 
 // ---------- نشان آهنگ جدید ----------
+
 function checkNewSongsBadge() {
   if (!songs.length) return;
   const newestCreatedAt = songs.reduce((max, s) => (s.createdAt > max ? s.createdAt : max), songs[0].createdAt);
@@ -673,6 +701,7 @@ function checkNewSongsBadge() {
     $("newBadge").classList.remove("hidden");
   }
 }
+
 const songsNavBtn = document.getElementById("songsNavBtn");
 if (songsNavBtn) {
   songsNavBtn.addEventListener("click", () => {
@@ -685,6 +714,7 @@ if (songsNavBtn) {
 }
 
 // ---------- باز کردن مستقیم آهنگ از لینک اشتراک‌گذاری‌شده (?song=ID) ----------
+
 function openSharedSongIfAny() {
   const params = new URLSearchParams(location.search);
   const songId = params.get("song");
@@ -694,6 +724,7 @@ function openSharedSongIfAny() {
 }
 
 // ---------- اعلان آهنگ جدید (Push Notification) ----------
+
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -734,7 +765,6 @@ if (notifyBtn) {
     try {
       const reg = await navigator.serviceWorker.ready;
       const existing = await reg.pushManager.getSubscription();
-
       if (existing) {
         await api("/push/unsubscribe", { method: "POST", body: { endpoint: existing.endpoint } });
         await existing.unsubscribe();
@@ -761,12 +791,14 @@ if (notifyBtn) {
 }
 
 // ---------- پنجره خوش‌آمد ----------
+
 const welcomeBtn = document.getElementById("welcomeBtn");
 if (welcomeBtn) {
   welcomeBtn.onclick = () => $("welcomeOverlay").classList.add("hide");
 }
 
 // ---------- انیمیشن لمس دکمه‌های دایره‌ای ----------
+
 document.querySelectorAll(".dock-controls button,.icon-btn-sm,.dock-nav button,.icon-circle,.like-inline,.menu").forEach((btn) => {
   btn.addEventListener("click", () => {
     btn.classList.remove("pop-anim");
@@ -776,6 +808,7 @@ document.querySelectorAll(".dock-controls button,.icon-btn-sm,.dock-nav button,.
 });
 
 // ---------- شروع ----------
+
 refreshDrawerUser();
 loadSongs();
 initPush();
