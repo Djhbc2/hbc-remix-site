@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /admin.html
 
-Sitemap: https://djhbc2.github.io/hbc-remix-site/sitemap.xml
+Sitemap: https://djhbc.ir/sitemap.xml
