@@ -33,19 +33,28 @@ function authHeaders() {
 }
 
 async function api(path, options = {}) {
-  const res = await fetch(API_BASE + path, {
-    ...options,
-    headers: {
-      // فقط وقتی body داریم Content-Type می‌فرستیم تا برای GET درخواست preflight (OPTIONS) ساخته نشه
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...authHeaders(),
-      ...(options.headers || {}),
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || "خطایی رخ داد");
-  return data;
+  const { timeout, ...fetchOptions } = options;
+  // اگه timeout (میلی‌ثانیه) داده بشه، درخواست بعد از اون زمان قطع می‌شه
+  const ctrl = timeout ? new AbortController() : null;
+  const timer = timeout ? setTimeout(() => ctrl.abort(), timeout) : null;
+  try {
+    const res = await fetch(API_BASE + path, {
+      ...fetchOptions,
+      signal: ctrl ? ctrl.signal : undefined,
+      headers: {
+        // فقط وقتی body داریم Content-Type می‌فرستیم تا برای GET درخواست preflight (OPTIONS) ساخته نشه
+        ...(fetchOptions.body ? { "Content-Type": "application/json" } : {}),
+        ...authHeaders(),
+        ...(fetchOptions.headers || {}),
+      },
+      body: fetchOptions.body ? JSON.stringify(fetchOptions.body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || "خطایی رخ داد");
+    return data;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 // ---------- بارگذاری آهنگ‌ها از سرور ----------
@@ -61,11 +70,67 @@ async function loadSongs(sort = currentSort) {
     // متن خطای واقعی رو نشون می‌ده تا علت مشخص بشه
     toast("خطا: " + e.message);
   }
+  afterSongsLoaded();
+}
+
+function afterSongsLoaded() {
   renderSongs();
   if (songs.length) setSong(0);
   checkNewSongsBadge();
   openSharedSongIfAny();
 }
+
+// ---------- صفحه لودینگ (فقط بار اول) ----------
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const loaderEl = $("loader");
+
+function setLoaderMsg(text) {
+  $("loaderMsg").textContent = text;
+}
+
+function hideLoader() {
+  if (!loaderEl) return;
+  loaderEl.classList.add("done");
+  setTimeout(() => loaderEl.remove(), 700);
+}
+
+async function bootLoad() {
+  if (!loaderEl) {
+    loadSongs();
+    return;
+  }
+  loaderEl.classList.remove("failed");
+  $("loaderRetry").classList.add("hidden");
+  setLoaderMsg("در حال بارگذاری آهنگ‌ها…");
+  const startedAt = Date.now();
+  // سرورِ رایگان بعد از بی‌کاری می‌خوابه و بیدار شدنش چند ثانیه طول می‌کشه
+  const wakeTimer = setTimeout(() => setLoaderMsg("سرور داره بیدار می‌شه؛ بار اول چند ثانیه طول می‌کشه…"), 4000);
+  let ok = false;
+  for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+    try {
+      const list = await api(`/songs?sort=${currentSort}`, { timeout: 35000 });
+      if (!Array.isArray(list)) throw new Error("پاسخ نامعتبر");
+      songs = list;
+      ok = true;
+    } catch (e) {
+      if (attempt < 2) await sleep(1500);
+    }
+  }
+  clearTimeout(wakeTimer);
+  if (!ok) {
+    loaderEl.classList.add("failed");
+    setLoaderMsg("اتصال به سرور برقرار نشد. اینترنتت رو چک کن و دوباره امتحان کن.");
+    $("loaderRetry").classList.remove("hidden");
+    return;
+  }
+  // حداقل زمان نمایش، تا انیمیشن لوگو برای یک لحظه نپره
+  const wait = 900 - (Date.now() - startedAt);
+  if (wait > 0) await sleep(wait);
+  afterSongsLoaded();
+  hideLoader();
+}
+
+if ($("loaderRetry")) $("loaderRetry").onclick = bootLoad;
 
 document.querySelectorAll(".sort-tab").forEach((btn) => {
   btn.onclick = () => {
@@ -117,6 +182,101 @@ function escapeHtml(str = "") {
   return str.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// ---------- نوشته‌ی تایپ‌شونده بالای پلیر ----------
+const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const statusBox = $("nowStatus");
+const statusText = $("statusText");
+const stLabel = $("stLabel");
+const stTitle = $("stTitle");
+let statusTarget = "";
+let statusTimer = null;
+let statusDebounce = null;
+
+function renderStatus(chars, labelLen) {
+  stLabel.textContent = chars.slice(0, labelLen).join("");
+  stTitle.textContent = chars.slice(labelLen).join("");
+}
+
+// بعد از تموم شدن تایپ: اگه متن از جعبه بلندتر بود، آروم بلغزه تا کامل خونده بشه
+function fitStatus() {
+  const clip = statusText.parentElement;
+  statusText.classList.remove("marquee");
+  clip.classList.remove("fade");
+  statusText.style.removeProperty("--shift");
+  if (!clip.clientWidth) return; // صفحه‌ی پلیر الان دیده نمی‌شه
+  const over = statusText.offsetWidth - clip.clientWidth;
+  if (over > 2) {
+    statusText.style.setProperty("--shift", over + 14 + "px");
+    statusText.style.setProperty("--dur", Math.max(7, (over + 14) / 16 + 3) + "s");
+    statusText.classList.add("marquee");
+    clip.classList.add("fade");
+  }
+}
+
+function typeStatus(label, title) {
+  clearTimeout(statusTimer);
+  const full = Array.from(label + title);
+  const labelLen = Array.from(label).length;
+  const shown = Array.from(stLabel.textContent + stTitle.textContent);
+  statusText.classList.remove("marquee");
+  statusText.style.removeProperty("--shift");
+  statusText.parentElement.classList.remove("fade");
+
+  if (reduceMotion) {
+    renderStatus(full, labelLen);
+    statusBox.classList.remove("typing");
+    fitStatus();
+    return;
+  }
+
+  statusBox.classList.add("typing");
+  const perChar = Math.min(55, Math.max(18, 1400 / full.length)); // نوشتن هیچ‌وقت بیشتر از حدود ۱.۴ ثانیه طول نمی‌کشه
+  let n = 0;
+  const type = () => {
+    n++;
+    renderStatus(full.slice(0, n), labelLen);
+    if (n < full.length) {
+      statusTimer = setTimeout(type, perChar + Math.random() * 22);
+    } else {
+      statusTimer = setTimeout(() => {
+        statusBox.classList.remove("typing");
+        fitStatus();
+      }, 500);
+    }
+  };
+  // اول متن قبلی با سرعت پاک می‌شه، بعد متن تازه تایپ می‌شه
+  let left = shown.length;
+  const erase = () => {
+    left = Math.max(0, left - Math.ceil(shown.length / 10));
+    renderStatus(shown.slice(0, left), Math.min(labelLen, left));
+    if (left > 0) statusTimer = setTimeout(erase, 16);
+    else statusTimer = setTimeout(type, 90);
+  };
+  if (left > 0) erase();
+  else type();
+}
+
+function setStatus() {
+  const s = songs[current];
+  if (!s) return;
+  const label = playing ? "در حال پخش: " : "متوقف شد: ";
+  $("statusEq").classList.toggle("paused", !playing);
+  const target = label + s.title;
+  if (target === statusTarget) return;
+  statusTarget = target;
+  typeStatus(label, s.title);
+}
+
+// چند فراخوانی پشت‌سرهم (مثلاً عوض شدن آهنگ + دکمه‌ی پخش) فقط یک بار تایپ ایجاد می‌کنن
+function scheduleStatus() {
+  clearTimeout(statusDebounce);
+  statusDebounce = setTimeout(setStatus, 0);
+}
+
+window.addEventListener("resize", () => {
+  if (!statusBox.classList.contains("typing")) fitStatus();
+});
+
 // ---------- پلیر ----------
 
 function setSong(i) {
@@ -145,6 +305,7 @@ function setSong(i) {
   if (playing) audio.play();
   updateLikeIcon();
   updateNowPlayingBadge();
+  scheduleStatus();
 }
 
 function openPlayer(i) {
@@ -175,6 +336,7 @@ function updateButtons() {
   $("iconPause").classList.toggle("hidden", !playing);
   $("miniPlay").textContent = playing ? "Ⅱ" : "▶";
   updateNowPlayingBadge();
+  scheduleStatus();
 }
 
 function next() {
@@ -363,6 +525,8 @@ function navigate(pageId) {
   if (pageId === "commentsPage") loadComments();
   if (pageId === "profilePage") loadProfile();
   if (pageId === "chartPage") loadChart();
+  if (pageId === "playerPage") fitStatus();
+  if (pageId === "authPage") initGoogle();
   // مینی‌پلیر: وقتی از صفحه پلیر خارج می‌شیم ولی آهنگی بارگذاری شده، نشونش بده تا پخش پس‌زمینه ادامه پیدا کنه
   if (pageId !== "playerPage" && songs.length && audio.src) {
     $("miniPlayer").classList.remove("hidden");
@@ -513,6 +677,62 @@ function onAuthSuccess(data) {
   updateLikeIcon();
   toast("خوش آمدی " + currentUser.name);
   navigate("songsPage");
+}
+
+// ---------- ورود با گوگل ----------
+// بعد از ساختن Client ID توی Google Cloud Console، اینجا بنویسش. تا خالی باشه، دکمه‌ی گوگل نمایش داده نمی‌شه.
+const GOOGLE_CLIENT_ID = "668146056183-eavbvuk1ec7qcj1k637md6jn3eohsq9j.apps.googleusercontent.com";
+
+let googleState = "idle"; // idle | loading | ready
+
+function initGoogle() {
+  if (!GOOGLE_CLIENT_ID || googleState !== "idle") return;
+  googleState = "loading";
+  const script = document.createElement("script");
+  script.src = "https://accounts.google.com/gsi/client";
+  script.async = true;
+  script.defer = true;
+  script.onload = () => {
+    if (!(window.google && google.accounts && google.accounts.id)) {
+      googleState = "idle";
+      return;
+    }
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: onGoogleCredential,
+      ux_mode: "popup",
+      auto_select: false,
+    });
+    const box = $("googleBox");
+    const holder = $("googleBtn");
+    // دکمه فقط وقتی نشون داده می‌شه که گوگل واقعاً لود شده باشه
+    box.classList.remove("hidden");
+    google.accounts.id.renderButton(holder, {
+      type: "standard",
+      theme: "filled_black",
+      size: "large",
+      shape: "pill",
+      text: "continue_with",
+      locale: "fa",
+      width: Math.min(360, Math.max(200, box.clientWidth || 300)),
+    });
+    googleState = "ready";
+  };
+  script.onerror = () => {
+    // گوگل در دسترس نیست: بخش گوگل مخفی می‌مونه و ورود با ایمیل مثل قبل کار می‌کنه
+    googleState = "idle";
+    script.remove();
+  };
+  document.head.appendChild(script);
+}
+
+async function onGoogleCredential(resp) {
+  try {
+    const data = await api("/auth/google", { method: "POST", body: { credential: resp.credential }, timeout: 35000 });
+    onAuthSuccess(data);
+  } catch (e) {
+    toast(e.message);
+  }
 }
 
 // ---------- پلی‌لیست من ----------
@@ -790,13 +1010,6 @@ if (notifyBtn) {
   };
 }
 
-// ---------- پنجره خوش‌آمد ----------
-
-const welcomeBtn = document.getElementById("welcomeBtn");
-if (welcomeBtn) {
-  welcomeBtn.onclick = () => $("welcomeOverlay").classList.add("hide");
-}
-
 // ---------- انیمیشن لمس دکمه‌های دایره‌ای ----------
 
 document.querySelectorAll(".dock-controls button,.icon-btn-sm,.dock-nav button,.icon-circle,.like-inline,.menu").forEach((btn) => {
@@ -810,5 +1023,5 @@ document.querySelectorAll(".dock-controls button,.icon-btn-sm,.dock-nav button,.
 // ---------- شروع ----------
 
 refreshDrawerUser();
-loadSongs();
+bootLoad();
 initPush();
