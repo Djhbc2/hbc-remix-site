@@ -6,18 +6,12 @@ const $ = (id) => document.getElementById(id);
 
 let adminToken = localStorage.getItem("hbc_admin_token") || null;
 
-function toast(msg, ms = 2200) {
+function toast(msg) {
   const t = $("toast");
   t.textContent = msg;
   t.classList.add("show");
   clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => t.classList.remove("show"), ms);
-}
-
-// خطاها رو طولانی‌تر نشون می‌ده تا بشه خوندشون
-function toastError(e) {
-  const msg = e && e.message === "Failed to fetch" ? "اتصال به سرور برقرار نشد (Failed to fetch)" : (e && e.message) || "خطایی رخ داد";
-  toast(msg, 6000);
+  toast._timer = setTimeout(() => t.classList.remove("show"), 2200);
 }
 
 function show(page) {
@@ -25,39 +19,17 @@ function show(page) {
   $("adminDashboard").classList.toggle("hidden", page !== "dashboard");
 }
 
-function forceLogout(message) {
-  adminToken = null;
-  localStorage.removeItem("hbc_admin_token");
-  show("login");
-  if (message) toast(message, 6000);
-}
-
-// درخواست‌های عمومی (بدون توکن و بدون هدر اضافه، تا preflight ساخته نشه)
-async function apiPublic(path) {
-  const res = await fetch(API_BASE + path);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || "خطایی رخ داد");
-  return data;
-}
-
-// درخواست‌های مدیر (با توکن)
 async function apiJson(path, options = {}) {
   const res = await fetch(API_BASE + path, {
     ...options,
     headers: {
-      // فقط وقتی body داریم Content-Type می‌فرستیم
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(adminToken ? { Authorization: "Bearer " + adminToken } : {}),
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + adminToken,
       ...(options.headers || {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 || res.status === 403) {
-    // توکن قدیمی یا نامعتبر: برگرد به صفحه ورود
-    forceLogout("نشست منقضی شده؛ دوباره وارد شو");
-    throw new Error(data.message || "نیاز به ورود مجدد");
-  }
   if (!res.ok) throw new Error(data.message || "خطایی رخ داد");
   return data;
 }
@@ -75,18 +47,20 @@ $("adminLoginForm").onsubmit = async (e) => {
         password: $("adminPassword").value,
       }),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || "نام کاربری یا رمز اشتباه است");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
     adminToken = data.token;
     localStorage.setItem("hbc_admin_token", adminToken);
     onLoggedIn();
   } catch (err) {
-    toastError(err);
+    toast(err.message);
   }
 };
 
 $("adminLogout").onclick = () => {
-  forceLogout();
+  adminToken = null;
+  localStorage.removeItem("hbc_admin_token");
+  show("login");
 };
 
 function onLoggedIn() {
@@ -102,7 +76,8 @@ function onLoggedIn() {
 
 async function loadAbout() {
   try {
-    const data = await apiPublic("/settings/about");
+    const res = await fetch(API_BASE + "/settings/about");
+    const data = await res.json();
     $("aboutTextarea").value = data.text || "";
   } catch (e) {}
 }
@@ -113,7 +88,7 @@ $("aboutForm").onsubmit = async (e) => {
     await apiJson("/settings/about", { method: "PUT", body: { text: $("aboutTextarea").value } });
     toast("متن ذخیره شد");
   } catch (err) {
-    toastError(err);
+    toast(err.message);
   }
 };
 
@@ -121,7 +96,8 @@ $("aboutForm").onsubmit = async (e) => {
 
 async function loadDjProfile() {
   try {
-    const data = await apiPublic("/settings/dj-profile");
+    const res = await fetch(API_BASE + "/settings/dj-profile");
+    const data = await res.json();
     $("djBioInput").value = data.bio || "";
     $("djPhotoInput").value = data.photo || "";
     $("djInstagramInput").value = data.instagram || "";
@@ -143,7 +119,7 @@ $("djProfileForm").onsubmit = async (e) => {
     });
     toast("پروفایل ذخیره شد");
   } catch (err) {
-    toastError(err);
+    toast(err.message);
   }
 };
 
@@ -159,7 +135,7 @@ async function loadStats() {
 <div class="stat"><b>${s.downloads}</b><span>دانلود</span></div>
 `;
   } catch (e) {
-    toastError(e);
+    toast(e.message);
   }
 }
 
@@ -181,18 +157,14 @@ $("uploadForm").onsubmit = async (e) => {
       headers: { Authorization: "Bearer " + adminToken },
       body: fd,
     });
-    const data = await res.json().catch(() => ({}));
-    if (res.status === 401 || res.status === 403) {
-      forceLogout("نشست منقضی شده؛ دوباره وارد شو");
-      return;
-    }
-    if (!res.ok) throw new Error(data.message || "آپلود ناموفق بود");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
     toast("آهنگ با موفقیت آپلود شد");
     $("uploadForm").reset();
     loadStats();
     loadAdminSongs();
   } catch (err) {
-    toastError(err);
+    toast(err.message);
   } finally {
     $("uploadBtn").disabled = false;
     $("uploadProgress").classList.add("hidden");
@@ -203,12 +175,10 @@ $("uploadForm").onsubmit = async (e) => {
 
 async function loadAdminSongs() {
   try {
-    // لیست آهنگ‌ها عمومیه؛ بدون هدر Authorization گرفته می‌شه
-    const songs = await apiPublic("/songs");
-    $("adminSongs").innerHTML = songs.length
-      ? songs
-          .map(
-            (s) => `<div class="admin-song" data-id="${s._id}">
+    const songs = await apiJson("/songs");
+    $("adminSongs").innerHTML = songs
+      .map(
+        (s) => `<div class="admin-song" data-id="${s._id}">
 <div class="admin-song-view">
 <img src="${s.cover}">
 <div class="admin-song-info">
@@ -231,11 +201,10 @@ async function loadAdminSongs() {
 </div>
 </div>
 </div>`
-          )
-          .join("")
-      : `<p class="hint">هنوز آهنگی ثبت نشده.</p>`;
+      )
+      .join("");
 
-    document.querySelectorAll(".btn-danger[data-id]").forEach((btn) => {
+    document.querySelectorAll(".btn-danger").forEach((btn) => {
       btn.onclick = () => deleteSong(btn.dataset.id);
     });
 
@@ -265,8 +234,7 @@ async function loadAdminSongs() {
       };
     });
   } catch (e) {
-    $("adminSongs").innerHTML = `<p class="hint">خطا در دریافت لیست آهنگ‌ها: ${escapeHtml(e.message)}</p>`;
-    toastError(e);
+    toast(e.message);
   }
 }
 
@@ -276,7 +244,7 @@ async function saveSongEdit(id, body) {
     toast("آهنگ ویرایش شد");
     loadAdminSongs();
   } catch (e) {
-    toastError(e);
+    toast(e.message);
   }
 }
 
@@ -288,12 +256,12 @@ async function deleteSong(id) {
     loadStats();
     loadAdminSongs();
   } catch (e) {
-    toastError(e);
+    toast(e.message);
   }
 }
 
 function escapeHtml(str = "") {
-  return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  return str.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 // ---------- مدیریت نظرات ----------
@@ -335,8 +303,7 @@ async function loadAdminComments() {
       };
     });
   } catch (e) {
-    $("adminComments").innerHTML = `<p class="hint">خطا در دریافت نظرات: ${escapeHtml(e.message)}</p>`;
-    toastError(e);
+    toast(e.message);
   }
 }
 
@@ -346,7 +313,7 @@ async function saveComment(id, text) {
     toast("نظر ویرایش شد");
     loadAdminComments();
   } catch (e) {
-    toastError(e);
+    toast(e.message);
   }
 }
 
@@ -358,7 +325,7 @@ async function deleteComment(id) {
     loadAdminComments();
     loadStats();
   } catch (e) {
-    toastError(e);
+    toast(e.message);
   }
 }
 
