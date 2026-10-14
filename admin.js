@@ -1,15 +1,23 @@
 // ⚠️ باید دقیقاً با app.js یکی باشد
+
 const API_BASE = "https://api.djhbc.ir/api";
 
 const $ = (id) => document.getElementById(id);
+
 let adminToken = localStorage.getItem("hbc_admin_token") || null;
 
-function toast(msg) {
+function toast(msg, ms = 2200) {
   const t = $("toast");
   t.textContent = msg;
   t.classList.add("show");
   clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => t.classList.remove("show"), 2200);
+  toast._timer = setTimeout(() => t.classList.remove("show"), ms);
+}
+
+// خطاها رو طولانی‌تر نشون می‌ده تا بشه خوندشون
+function toastError(e) {
+  const msg = e && e.message === "Failed to fetch" ? "اتصال به سرور برقرار نشد (Failed to fetch)" : (e && e.message) || "خطایی رخ داد";
+  toast(msg, 6000);
 }
 
 function show(page) {
@@ -17,22 +25,45 @@ function show(page) {
   $("adminDashboard").classList.toggle("hidden", page !== "dashboard");
 }
 
-async function apiJson(path, options = {}) {
-  const res = await fetch(API_BASE + path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + adminToken,
-      ...(options.headers || {}),
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+function forceLogout(message) {
+  adminToken = null;
+  localStorage.removeItem("hbc_admin_token");
+  show("login");
+  if (message) toast(message, 6000);
+}
+
+// درخواست‌های عمومی (بدون توکن و بدون هدر اضافه، تا preflight ساخته نشه)
+async function apiPublic(path) {
+  const res = await fetch(API_BASE + path);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || "خطایی رخ داد");
   return data;
 }
 
+// درخواست‌های مدیر (با توکن)
+async function apiJson(path, options = {}) {
+  const res = await fetch(API_BASE + path, {
+    ...options,
+    headers: {
+      // فقط وقتی body داریم Content-Type می‌فرستیم
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(adminToken ? { Authorization: "Bearer " + adminToken } : {}),
+      ...(options.headers || {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 || res.status === 403) {
+    // توکن قدیمی یا نامعتبر: برگرد به صفحه ورود
+    forceLogout("نشست منقضی شده؛ دوباره وارد شو");
+    throw new Error(data.message || "نیاز به ورود مجدد");
+  }
+  if (!res.ok) throw new Error(data.message || "خطایی رخ داد");
+  return data;
+}
+
 // ---------- ورود مدیر ----------
+
 $("adminLoginForm").onsubmit = async (e) => {
   e.preventDefault();
   try {
@@ -44,20 +75,18 @@ $("adminLoginForm").onsubmit = async (e) => {
         password: $("adminPassword").value,
       }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || "نام کاربری یا رمز اشتباه است");
     adminToken = data.token;
     localStorage.setItem("hbc_admin_token", adminToken);
     onLoggedIn();
   } catch (err) {
-    toast(err.message);
+    toastError(err);
   }
 };
 
 $("adminLogout").onclick = () => {
-  adminToken = null;
-  localStorage.removeItem("hbc_admin_token");
-  show("login");
+  forceLogout();
 };
 
 function onLoggedIn() {
@@ -70,10 +99,10 @@ function onLoggedIn() {
 }
 
 // ---------- درباره ریمیکس ----------
+
 async function loadAbout() {
   try {
-    const res = await fetch(API_BASE + "/settings/about");
-    const data = await res.json();
+    const data = await apiPublic("/settings/about");
     $("aboutTextarea").value = data.text || "";
   } catch (e) {}
 }
@@ -84,15 +113,15 @@ $("aboutForm").onsubmit = async (e) => {
     await apiJson("/settings/about", { method: "PUT", body: { text: $("aboutTextarea").value } });
     toast("متن ذخیره شد");
   } catch (err) {
-    toast(err.message);
+    toastError(err);
   }
 };
 
 // ---------- پروفایل عمومی DJ ----------
+
 async function loadDjProfile() {
   try {
-    const res = await fetch(API_BASE + "/settings/dj-profile");
-    const data = await res.json();
+    const data = await apiPublic("/settings/dj-profile");
     $("djBioInput").value = data.bio || "";
     $("djPhotoInput").value = data.photo || "";
     $("djInstagramInput").value = data.instagram || "";
@@ -114,26 +143,28 @@ $("djProfileForm").onsubmit = async (e) => {
     });
     toast("پروفایل ذخیره شد");
   } catch (err) {
-    toast(err.message);
+    toastError(err);
   }
 };
 
 // ---------- آمار ----------
+
 async function loadStats() {
   try {
     const s = await apiJson("/admin/stats");
     $("statsBox").innerHTML = `
-      <div class="stat"><b>${s.songs}</b><span>آهنگ</span></div>
-      <div class="stat"><b>${s.users}</b><span>کاربر</span></div>
-      <div class="stat"><b>${s.comments}</b><span>نظر</span></div>
-      <div class="stat"><b>${s.downloads}</b><span>دانلود</span></div>
-    `;
+<div class="stat"><b>${s.songs}</b><span>آهنگ</span></div>
+<div class="stat"><b>${s.users}</b><span>کاربر</span></div>
+<div class="stat"><b>${s.comments}</b><span>نظر</span></div>
+<div class="stat"><b>${s.downloads}</b><span>دانلود</span></div>
+`;
   } catch (e) {
-    toast(e.message);
+    toastError(e);
   }
 }
 
 // ---------- آپلود آهنگ ----------
+
 $("uploadForm").onsubmit = async (e) => {
   e.preventDefault();
   const fd = new FormData();
@@ -142,7 +173,6 @@ $("uploadForm").onsubmit = async (e) => {
   fd.append("time", $("upTime").value || "00:00");
   fd.append("cover", $("upCover").files[0]);
   fd.append("audio", $("upAudio").files[0]);
-
   $("uploadBtn").disabled = true;
   $("uploadProgress").classList.remove("hidden");
   try {
@@ -151,14 +181,18 @@ $("uploadForm").onsubmit = async (e) => {
       headers: { Authorization: "Bearer " + adminToken },
       body: fd,
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message);
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) {
+      forceLogout("نشست منقضی شده؛ دوباره وارد شو");
+      return;
+    }
+    if (!res.ok) throw new Error(data.message || "آپلود ناموفق بود");
     toast("آهنگ با موفقیت آپلود شد");
     $("uploadForm").reset();
     loadStats();
     loadAdminSongs();
   } catch (err) {
-    toast(err.message);
+    toastError(err);
   } finally {
     $("uploadBtn").disabled = false;
     $("uploadProgress").classList.add("hidden");
@@ -166,40 +200,45 @@ $("uploadForm").onsubmit = async (e) => {
 };
 
 // ---------- لیست و حذف آهنگ‌ها ----------
+
 async function loadAdminSongs() {
   try {
-    const songs = await apiJson("/songs");
-    $("adminSongs").innerHTML = songs
-      .map(
-        (s) => `<div class="admin-song" data-id="${s._id}">
-        <div class="admin-song-view">
-          <img src="${s.cover}">
-          <div class="admin-song-info">
-            <b>${escapeHtml(s.title)}</b>
-            <small>${escapeHtml(s.artist)} • ${s.time} • ${s.downloads || 0} دانلود</small>
-          </div>
-          <button class="btn-ghost edit-song" data-id="${s._id}">ویرایش</button>
-          <button class="btn-danger" data-id="${s._id}">حذف</button>
-        </div>
-        <div class="admin-song-edit hidden">
-          <label>عنوان آهنگ</label>
-          <input type="text" class="edit-title" value="${escapeHtml(s.title)}">
-          <label>نام خواننده</label>
-          <input type="text" class="edit-artist" value="${escapeHtml(s.artist)}">
-          <label>مدت زمان</label>
-          <input type="text" class="edit-time" value="${escapeHtml(s.time)}">
-          <div class="admin-song-edit-actions">
-            <button class="btn-primary save-song" data-id="${s._id}">ذخیره</button>
-            <button class="btn-ghost cancel-edit">انصراف</button>
-          </div>
-        </div>
-      </div>`
-      )
-      .join("");
+    // لیست آهنگ‌ها عمومیه؛ بدون هدر Authorization گرفته می‌شه
+    const songs = await apiPublic("/songs");
+    $("adminSongs").innerHTML = songs.length
+      ? songs
+          .map(
+            (s) => `<div class="admin-song" data-id="${s._id}">
+<div class="admin-song-view">
+<img src="${s.cover}">
+<div class="admin-song-info">
+<b>${escapeHtml(s.title)}</b>
+<small>${escapeHtml(s.artist)} • ${s.time} • ${s.downloads || 0} دانلود</small>
+</div>
+<button class="btn-ghost edit-song" data-id="${s._id}">ویرایش</button>
+<button class="btn-danger" data-id="${s._id}">حذف</button>
+</div>
+<div class="admin-song-edit hidden">
+<label>عنوان آهنگ</label>
+<input type="text" class="edit-title" value="${escapeHtml(s.title)}">
+<label>نام خواننده</label>
+<input type="text" class="edit-artist" value="${escapeHtml(s.artist)}">
+<label>مدت زمان</label>
+<input type="text" class="edit-time" value="${escapeHtml(s.time)}">
+<div class="admin-song-edit-actions">
+<button class="btn-primary save-song" data-id="${s._id}">ذخیره</button>
+<button class="btn-ghost cancel-edit">انصراف</button>
+</div>
+</div>
+</div>`
+          )
+          .join("")
+      : `<p class="hint">هنوز آهنگی ثبت نشده.</p>`;
 
-    document.querySelectorAll(".btn-danger").forEach((btn) => {
+    document.querySelectorAll(".btn-danger[data-id]").forEach((btn) => {
       btn.onclick = () => deleteSong(btn.dataset.id);
     });
+
     document.querySelectorAll(".edit-song").forEach((btn) => {
       btn.onclick = () => {
         const wrap = btn.closest(".admin-song");
@@ -207,6 +246,7 @@ async function loadAdminSongs() {
         wrap.querySelector(".admin-song-edit").classList.remove("hidden");
       };
     });
+
     document.querySelectorAll(".cancel-edit").forEach((btn) => {
       btn.onclick = () => {
         const wrap = btn.closest(".admin-song");
@@ -214,6 +254,7 @@ async function loadAdminSongs() {
         wrap.querySelector(".admin-song-view").classList.remove("hidden");
       };
     });
+
     document.querySelectorAll(".save-song").forEach((btn) => {
       btn.onclick = () => {
         const wrap = btn.closest(".admin-song");
@@ -224,7 +265,8 @@ async function loadAdminSongs() {
       };
     });
   } catch (e) {
-    toast(e.message);
+    $("adminSongs").innerHTML = `<p class="hint">خطا در دریافت لیست آهنگ‌ها: ${escapeHtml(e.message)}</p>`;
+    toastError(e);
   }
 }
 
@@ -234,7 +276,7 @@ async function saveSongEdit(id, body) {
     toast("آهنگ ویرایش شد");
     loadAdminSongs();
   } catch (e) {
-    toast(e.message);
+    toastError(e);
   }
 }
 
@@ -246,15 +288,16 @@ async function deleteSong(id) {
     loadStats();
     loadAdminSongs();
   } catch (e) {
-    toast(e.message);
+    toastError(e);
   }
 }
 
 function escapeHtml(str = "") {
-  return str.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 // ---------- مدیریت نظرات ----------
+
 async function loadAdminComments() {
   try {
     const comments = await apiJson("/admin/comments");
@@ -262,16 +305,16 @@ async function loadAdminComments() {
       ? comments
           .map(
             (c) => `<div class="admin-comment" data-id="${c._id}">
-        <div class="admin-comment-head">
-          <b>${escapeHtml(c.name)}</b>
-          <small>روی «${escapeHtml(c.songTitle)}»</small>
-        </div>
-        <textarea class="admin-comment-text">${escapeHtml(c.text)}</textarea>
-        <div class="admin-comment-actions">
-          <button class="btn-ghost save-comment">ذخیره ویرایش</button>
-          <button class="btn-danger delete-comment">حذف</button>
-        </div>
-      </div>`
+<div class="admin-comment-head">
+<b>${escapeHtml(c.name)}</b>
+<small>روی «${escapeHtml(c.songTitle)}»</small>
+</div>
+<textarea class="admin-comment-text">${escapeHtml(c.text)}</textarea>
+<div class="admin-comment-actions">
+<button class="btn-ghost save-comment">ذخیره ویرایش</button>
+<button class="btn-danger delete-comment">حذف</button>
+</div>
+</div>`
           )
           .join("")
       : `<p class="hint">هنوز نظری ثبت نشده.</p>`;
@@ -284,6 +327,7 @@ async function loadAdminComments() {
         saveComment(id, text);
       };
     });
+
     document.querySelectorAll(".delete-comment").forEach((btn) => {
       btn.onclick = () => {
         const id = btn.closest(".admin-comment").dataset.id;
@@ -291,7 +335,8 @@ async function loadAdminComments() {
       };
     });
   } catch (e) {
-    toast(e.message);
+    $("adminComments").innerHTML = `<p class="hint">خطا در دریافت نظرات: ${escapeHtml(e.message)}</p>`;
+    toastError(e);
   }
 }
 
@@ -301,7 +346,7 @@ async function saveComment(id, text) {
     toast("نظر ویرایش شد");
     loadAdminComments();
   } catch (e) {
-    toast(e.message);
+    toastError(e);
   }
 }
 
@@ -313,10 +358,11 @@ async function deleteComment(id) {
     loadAdminComments();
     loadStats();
   } catch (e) {
-    toast(e.message);
+    toastError(e);
   }
 }
 
 // ---------- شروع ----------
+
 if (adminToken) onLoggedIn();
 else show("login");
