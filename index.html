@@ -13,9 +13,77 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://djhbc.ir/">
 <link rel="canonical" href="https://djhbc.ir/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- فونت به‌صورت غیرمسدودکننده لود می‌شه تا اگه گوگل‌فونت کند بود، صفحه معطل نمونه -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap"></noscript>
 <link rel="stylesheet" href="style.css">
+<style>
+/* ---------- صفحه لودینگ (داخل HTML تا قبل از هر چیز دیگه‌ای نمایش داده بشه) ---------- */
+.loader{
+ position:fixed;inset:0;z-index:1000;background:#090a0a;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+ padding:24px;text-align:center;font-family:Vazirmatn,Tahoma,Arial,sans-serif;color:#fff;
+ transition:opacity .55s ease,transform .55s ease,visibility 0s linear .55s
+}
+.loader.done{opacity:0;transform:scale(1.04);visibility:hidden;pointer-events:none}
+.loader-glow{
+ position:absolute;width:min(520px,130vw);height:min(520px,130vw);border-radius:50%;
+ background:radial-gradient(circle,rgba(255,159,10,.34) 0%,rgba(255,106,0,.14) 38%,transparent 68%);
+ animation:ldGlow 3.4s ease-in-out infinite
+}
+.loader-logo{
+ position:relative;width:min(230px,58vw);height:auto;
+ filter:drop-shadow(0 0 22px rgba(255,159,10,.35));
+ animation:ldIn .7s cubic-bezier(.2,.8,.2,1) both,ldBreathe 3.4s ease-in-out .7s infinite
+}
+.loader-bars{
+ position:relative;display:flex;align-items:center;justify-content:center;gap:5px;
+ height:70px;margin:26px 0 18px;direction:ltr;animation:ldIn .7s .25s cubic-bezier(.2,.8,.2,1) both
+}
+.loader-bars i{
+ display:block;width:4px;height:var(--h);border-radius:3px;
+ background:linear-gradient(180deg,#ffc15a,#ff9f0a 55%,#ff6a00);
+ transform:scaleY(.16);animation:ldBar var(--d) ease-in-out calc(var(--i) * -.11s) infinite
+}
+.loader-name{
+ position:relative;direction:ltr;font-weight:800;font-size:13px;letter-spacing:.62em;
+ padding-left:.62em;color:#ff9f0a;animation:ldIn .7s .45s cubic-bezier(.2,.8,.2,1) both
+}
+.loader-msg{
+ position:relative;margin:16px 0 0;min-height:22px;max-width:290px;font-size:12.5px;line-height:1.8;
+ color:rgba(255,255,255,.6);animation:ldIn .7s .65s cubic-bezier(.2,.8,.2,1) both
+}
+.loader-retry{
+ position:relative;margin-top:14px;padding:11px 26px;border-radius:14px;border:0;cursor:pointer;
+ background:#ff9f0a;color:#1a1200;font:700 13px Vazirmatn,Tahoma,Arial,sans-serif;
+ box-shadow:0 10px 25px rgba(255,120,0,.3)
+}
+.loader-retry.hidden{display:none}
+.loader.failed .loader-bars i{animation-play-state:paused;transform:scaleY(.16)}
+.loader.failed .loader-glow{animation-play-state:paused;opacity:.4}
+@keyframes ldIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes ldBreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+@keyframes ldGlow{0%,100%{opacity:.7;transform:scale(.94)}50%{opacity:1;transform:scale(1.06)}}
+@keyframes ldBar{0%,100%{transform:scaleY(.16)}50%{transform:scaleY(1)}}
+@media (prefers-reduced-motion:reduce){
+ .loader *{animation:none!important}
+ .loader-bars i{transform:scaleY(.55)}
+}
+</style>
 </head>
 <body>
+<!-- صفحه لودینگ: تا وقتی آهنگ‌ها از سرور نیومدن نمایش داده می‌شه -->
+<div id="loader" class="loader" role="status" aria-live="polite">
+  <div class="loader-glow"></div>
+  <img class="loader-logo" src="logo.png" alt="HBC REMIX">
+  <div class="loader-bars" aria-hidden="true"><i style="--h:10px;--d:0.9s;--i:0"></i><i style="--h:16px;--d:1.1s;--i:1"></i><i style="--h:24px;--d:0.8s;--i:2"></i><i style="--h:34px;--d:1.2s;--i:3"></i><i style="--h:44px;--d:0.95s;--i:4"></i><i style="--h:30px;--d:1.05s;--i:5"></i><i style="--h:52px;--d:0.85s;--i:6"></i><i style="--h:38px;--d:1.15s;--i:7"></i><i style="--h:62px;--d:1.0s;--i:8"></i><i style="--h:38px;--d:1.1s;--i:9"></i><i style="--h:52px;--d:0.9s;--i:10"></i><i style="--h:30px;--d:1.2s;--i:11"></i><i style="--h:44px;--d:0.8s;--i:12"></i><i style="--h:34px;--d:1.05s;--i:13"></i><i style="--h:24px;--d:0.95s;--i:14"></i><i style="--h:16px;--d:1.1s;--i:15"></i><i style="--h:10px;--d:0.9s;--i:16"></i></div>
+  <div class="loader-name">DJ HBC</div>
+  <p id="loaderMsg" class="loader-msg">در حال بارگذاری آهنگ‌ها…</p>
+  <button id="loaderRetry" class="loader-retry hidden" type="button">تلاش دوباره</button>
+</div>
+
 <div class="glow g1"></div><div class="glow g2"></div>
 
 <!-- پس‌زمینه تیره پشت منو -->
@@ -40,17 +108,6 @@
       <a id="djTelegram" href="#" target="_blank" class="dj-social-btn hidden">تلگرام</a>
     </div>
     <button id="djProfileCloseBtn" class="welcome-btn">بستن</button>
-  </div>
-</div>
-
-<div id="welcomeOverlay" class="welcome-overlay">
-  <div class="welcome-card">
-    <div class="welcome-icon">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#1a1200" stroke-width="1.8" stroke-linejoin="round"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#1a1200" stroke-width="1.8" stroke-linejoin="round"/></svg>
-    </div>
-    <h3>به HBC REMIX خوش اومدی</h3>
-    <p>برای پخش بی‌وقفه‌ی آهنگ‌ها و دسترسی به همه‌ی امکانات سایت،<br><b>لطفاً فیلترشکن‌ت رو روشن نگه دار</b> 🙏</p>
-    <button id="welcomeBtn" class="welcome-btn">متوجه شدم، بریم</button>
   </div>
 </div>
 
@@ -110,7 +167,10 @@
       <button id="backBtn" class="icon-circle">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <div class="searchbox"><span>پخش در حال انجام</span></div>
+      <div class="searchbox" id="nowStatus" aria-live="polite">
+        <span class="status-eq paused" id="statusEq" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="status-clip"><span class="status-text" id="statusText"><b id="stLabel">آماده پخش</b><span id="stTitle"></span></span></span>
+      </div>
       <img class="logo" style="height:26px;padding:6px 12px" src="logo.png" alt="">
     </header>
 
@@ -221,6 +281,12 @@
       <input type="password" id="signupPassword" required placeholder="حداقل ۶ کاراکتر">
       <button type="submit" class="btn-primary">ثبت‌نام</button>
     </form>
+
+    <!-- ورود با گوگل: تا وقتی دکمه‌ی گوگل لود نشده مخفیه، پس اگه گوگل در دسترس نبود چیزی خراب نمی‌شه -->
+    <div id="googleBox" class="google-box hidden">
+      <div class="or-divider"><span>یا</span></div>
+      <div id="googleBtn" class="google-btn"></div>
+    </div>
   </section>
 
   <!-- صفحه 4: پلی‌لیست من (آهنگ‌های سیوشده) -->

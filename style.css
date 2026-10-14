@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
+/* فونت Vazirmatn داخل index.html لود می‌شه (غیرمسدودکننده) */
 
 *{box-sizing:border-box}
 :root{
@@ -67,8 +67,22 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .bg-cover img{width:100%;height:100%;object-fit:cover;filter:blur(2px) brightness(.5)}
 .bg-cover:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,5,5,.15) 0%,rgba(5,5,5,.6) 50%,#050505 88%)}
 .p-header{position:relative;z-index:2;display:flex;align-items:center;gap:10px;padding:16px 18px 0;flex-shrink:0}
-.searchbox{flex:1;height:38px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(14px);display:flex;align-items:center;padding:0 14px;color:rgba(255,255,255,.4);font-size:12px;min-width:0}
-.searchbox span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* نوار وضعیت بالای پلیر (نوشته‌ی تایپ‌شونده) */
+.searchbox{flex:1;height:38px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(14px);display:flex;align-items:center;gap:9px;padding:0 14px;color:rgba(255,255,255,.88);font-size:12px;min-width:0}
+.status-eq{display:inline-flex;align-items:flex-end;gap:2px;height:13px;flex-shrink:0}
+.status-eq i{width:2.5px;height:4px;background:var(--orange);border-radius:2px;animation:eqBar .9s ease-in-out infinite}
+.status-eq i:nth-child(2){animation-delay:.2s}
+.status-eq i:nth-child(3){animation-delay:.4s}
+.status-eq.paused i{animation-play-state:paused;height:4px!important}
+.status-clip{flex:1;min-width:0;overflow:hidden;white-space:nowrap}
+.status-clip.fade{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 14px),transparent 100%)}
+.status-text{display:inline-block;white-space:nowrap}
+.status-text b{color:var(--orange);font-weight:600;margin-inline-end:.4em}
+.searchbox.typing .status-text:after{content:"";display:inline-block;width:2px;height:13px;margin-inline-start:3px;vertical-align:-2px;background:var(--orange);animation:caret .7s steps(1) infinite}
+.status-text.marquee{animation:statusSlide var(--dur,8s) ease-in-out infinite}
+@keyframes caret{50%{opacity:0}}
+@keyframes statusSlide{0%,16%{transform:translateX(0)}50%,66%{transform:translateX(var(--shift,0px))}100%{transform:translateX(0)}}
+@media (prefers-reduced-motion:reduce){.status-text.marquee{animation:none}.searchbox.typing .status-text:after{animation:none}}
 .stage{position:relative;z-index:1;flex:1;min-height:0;display:flex;flex-direction:column;padding:14px 18px 0}
 .cover-box{flex:1;min-height:0;width:100%;border-radius:28px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.1)}
 .cover-box img{width:100%;height:100%;object-fit:cover;display:block}
@@ -226,6 +240,12 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .sort-tab{padding:8px 16px;border-radius:20px;background:var(--glass);border:1px solid var(--border);font-size:12px}
 .sort-tab.active{background:var(--orange);color:#111;font-weight:700;border-color:var(--orange)}
 .divider{border:0;border-top:1px solid var(--border);margin:16px 0}
+
+/* ورود با گوگل */
+.google-box{margin-top:22px}
+.or-divider{display:flex;align-items:center;gap:12px;margin-bottom:16px;color:var(--muted);font-size:12px}
+.or-divider:before,.or-divider:after{content:"";flex:1;height:1px;background:var(--border)}
+.google-btn{display:flex;justify-content:center;min-height:44px}
 
 /* نظرات */
 .comment-form{margin:18px 0}
