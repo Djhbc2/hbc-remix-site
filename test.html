@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تست اتصال</title>
+<style>
+  body{font-family:sans-serif;background:#111;color:#eee;padding:14px;line-height:1.7;font-size:15px}
+  h1{font-size:18px;margin:0 0 10px}
+  .t{border:1px solid #333;border-radius:10px;padding:10px;margin:10px 0;background:#1a1a1a}
+  .ok{color:#6fdc8c}.bad{color:#ff7b7b}.wait{color:#ffc857}
+  pre{white-space:pre-wrap;word-break:break-all;direction:ltr;text-align:left;font-size:12px;color:#bbb;margin:6px 0 0}
+  button{background:#ff9f0a;border:0;border-radius:10px;padding:10px 16px;font-size:15px;margin-top:6px}
+</style>
+</head>
+<body>
+<h1>تست اتصال به سرور</h1>
+<div id="info" class="t"></div>
+<div id="out"></div>
+<button id="again">تست دوباره</button>
+
+<script>
+var API = "https://api.djhbc.ir/api/songs";
+var STORAGE = "https://hbc-remix.s3.ir-thr-at1.arvanstorage.ir/";
+var out = document.getElementById("out");
+
+document.getElementById("info").textContent =
+  "آدرس این صفحه: " + location.href + "  |  آنلاین: " + navigator.onLine;
+
+function box(title){
+  var d = document.createElement("div");
+  d.className = "t";
+  d.innerHTML = "<b>" + title + "</b><div class='r wait'>در حال تست…</div><pre></pre>";
+  out.appendChild(d);
+  return d;
+}
+function done(d, ok, msg, extra){
+  var r = d.querySelector(".r");
+  r.className = "r " + (ok ? "ok" : "bad");
+  r.textContent = msg;
+  d.querySelector("pre").textContent = extra || "";
+}
+function withTimeout(promiseFn, ms){
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, ms);
+  return promiseFn(ctrl.signal).finally(function(){ clearTimeout(timer); });
+}
+function errText(e){
+  return (e.name === "AbortError") ? "timeout (بعد از ۱۵ ثانیه جواب نیومد)" : (e.name + ": " + e.message);
+}
+
+function run(){
+  out.innerHTML = "";
+
+  // 1) درخواست ساده GET (مثل سایت اصلی)
+  var t1 = box("۱) درخواست ساده GET به API");
+  var s1 = Date.now();
+  withTimeout(function(sig){ return fetch(API, {signal: sig}); }, 15000)
+    .then(function(res){
+      return res.text().then(function(body){
+        var ms = Date.now() - s1;
+        done(t1, res.ok, "وضعیت " + res.status + " در " + ms + " میلی‌ثانیه",
+          "content-type: " + res.headers.get("content-type") + "\n\n" + body.slice(0, 180));
+      });
+    })
+    .catch(function(e){ done(t1, false, "ناموفق: " + errText(e), ""); });
+
+  // 2) همون درخواست با no-cors (فقط شبکه رو می‌سنجه، CORS مهم نیست)
+  var t2 = box("۲) درخواست no-cors (فقط اتصال شبکه)");
+  var s2 = Date.now();
+  withTimeout(function(sig){ return fetch(API, {mode: "no-cors", signal: sig}); }, 15000)
+    .then(function(res){
+      done(t2, true, "اتصال شبکه برقراره (" + (Date.now() - s2) + " میلی‌ثانیه)", "type: " + res.type);
+    })
+    .catch(function(e){ done(t2, false, "ناموفق: " + errText(e), ""); });
+
+  // 3) درخواست با Content-Type (باعث preflight می‌شه)
+  var t3 = box("۳) درخواست با هدر Content-Type (preflight)");
+  withTimeout(function(sig){
+    return fetch(API, {headers: {"Content-Type": "application/json"}, signal: sig});
+  }, 15000)
+    .then(function(res){ done(t3, res.ok, "وضعیت " + res.status, ""); })
+    .catch(function(e){ done(t3, false, "ناموفق: " + errText(e), ""); });
+
+  // 4) دسترسی به آروان‌استوریج (کاور و آهنگ‌ها)
+  var t4 = box("۴) دسترسی به آروان‌استوریج (فایل‌ها)");
+  var s4 = Date.now();
+  withTimeout(function(sig){ return fetch(STORAGE, {mode: "no-cors", signal: sig}); }, 15000)
+    .then(function(){ done(t4, true, "اتصال برقراره (" + (Date.now() - s4) + " میلی‌ثانیه)", ""); })
+    .catch(function(e){ done(t4, false, "ناموفق: " + errText(e), ""); });
+}
+
+document.getElementById("again").onclick = run;
+run();
+</script>
+</body>
+</html>
