@@ -104,7 +104,7 @@ async function bootLoad() {
   setLoaderMsg("در حال بارگذاری آهنگ‌ها…");
   const startedAt = Date.now();
   // سرورِ رایگان بعد از بی‌کاری می‌خوابه و بیدار شدنش چند ثانیه طول می‌کشه
-  const wakeTimer = setTimeout(() => setLoaderMsg("سرور داره بیدار می‌شه؛ بار اول چند ثانیه طول می‌کشه…"), 4000);
+  const wakeTimer = setTimeout(() => setLoaderMsg("در حال بارگذاری ریمیکس ها می باشیم کمی صبر کنید…"), 4000);
   let ok = false;
   for (let attempt = 0; attempt < 3 && !ok; attempt++) {
     try {
