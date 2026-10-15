@@ -42,3 +42,11 @@
 @media(max-width:390px){
  .stats{grid-template-columns:repeat(2,1fr)}
 }
+
+.reply-row{display:flex;gap:8px;margin:8px 0}
+.reply-row input{flex:1;min-width:0}
+.reply-row .btn-primary{width:auto;padding:8px 16px}
+.check-row{display:flex;align-items:center;gap:8px;margin:8px 0}
+.check-row input{width:auto}
+.admin-comment.done{opacity:.55}
+.req-text{margin:6px 0}

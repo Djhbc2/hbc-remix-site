@@ -294,3 +294,69 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
  .song b{font-size:13px}
  .dock-controls .play{width:54px;height:54px}
 }
+
+/* ---------- تم‌ها (رنگ اصلی سایت) ---------- */
+html[data-theme="blue"]{--orange:#2ea8ff}
+html[data-theme="purple"]{--orange:#a45bff}
+html[data-theme="pink"]{--orange:#ff4f9a}
+html[data-theme="green"]{--orange:#2fd27a}
+html[data-theme="blue"] .g1{background:#1478d4}html[data-theme="blue"] .g2{background:#0a3fd0}
+html[data-theme="purple"] .g1{background:#7a2cff}html[data-theme="purple"] .g2{background:#c02cff}
+html[data-theme="pink"] .g1{background:#ff2f86}html[data-theme="pink"] .g2{background:#ff5a3d}
+html[data-theme="green"] .g1{background:#12b866}html[data-theme="green"] .g2{background:#0a8f9c}
+.theme-swatches{display:flex;gap:12px;justify-content:center;margin:6px 0 16px}
+.theme-swatches button{width:40px;height:40px;border-radius:50%;background:var(--c);border:2px solid rgba(255,255,255,.25);transition:.15s}
+.theme-swatches button.sel{border-color:#fff;transform:scale(1.15);box-shadow:0 0 14px var(--c)}
+
+/* ---------- ریمیکس هفته ---------- */
+.featured{display:flex;align-items:center;gap:12px;margin:14px 0 4px;padding:10px;border-radius:18px;width:100%;text-align:right;
+ background:linear-gradient(135deg,color-mix(in srgb,var(--orange) 28%,transparent),rgba(255,255,255,.05));
+ border:1px solid color-mix(in srgb,var(--orange) 55%,transparent);position:relative;overflow:hidden}
+.featured img{width:72px;height:72px;border-radius:14px;object-fit:cover;flex-shrink:0;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.featured small{color:var(--orange);font-weight:700;font-size:11.5px;display:block;margin-bottom:3px}
+.featured b{display:block;font-size:15px}
+.featured span.f-art{color:var(--muted);font-size:12px}
+.featured .f-play{margin-inline-start:auto;width:40px;height:40px;border-radius:50%;background:var(--orange);color:#111;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ---------- چیپ سبک‌ها و نشان NEW ---------- */
+.genre-chips{display:flex;gap:8px;overflow-x:auto;padding:4px 0 12px;scrollbar-width:none}
+.genre-chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:6px 14px;border-radius:999px;font-size:12.5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:var(--muted)}
+.chip.active{background:var(--orange);color:#111;border-color:var(--orange);font-weight:700}
+.new-tag{display:inline-block;margin-inline-start:6px;padding:1px 6px;border-radius:6px;font-size:9.5px;font-weight:800;background:var(--orange);color:#111;vertical-align:middle;letter-spacing:.5px}
+.song.gone{display:none}
+
+/* ---------- ویژوالایزر روی کاور ---------- */
+.cover-box{position:relative}
+.viz{position:absolute;inset:auto 0 0 0;height:46%;display:flex;align-items:flex-end;justify-content:center;gap:3px;padding:0 14px 10px;pointer-events:none;
+ background:linear-gradient(to top,rgba(0,0,0,.55),transparent);border-radius:0 0 inherit inherit;opacity:0;transition:opacity .4s}
+.viz i{flex:1;max-width:9px;min-height:4px;height:var(--h,30%);background:var(--orange);border-radius:3px 3px 0 0;transform-origin:bottom;animation:vizBar var(--d,.9s) ease-in-out infinite alternate;animation-play-state:paused}
+body.is-playing .viz{opacity:1}
+body.is-playing .viz i{animation-play-state:running}
+@keyframes vizBar{from{transform:scaleY(.18)}to{transform:scaleY(1)}}
+
+/* ---------- فهرست ست ---------- */
+.tracklist-btn{margin-top:8px;padding:6px 14px;border-radius:999px;font-size:12px;color:var(--orange);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tracklist-card{max-height:78vh;display:flex;flex-direction:column}
+.tracklist-items{overflow-y:auto;margin:6px 0 14px;text-align:right}
+.tl-item{display:flex;gap:10px;width:100%;padding:10px 6px;border-bottom:1px solid rgba(255,255,255,.08);text-align:right;align-items:center}
+.tl-item .tl-t{color:var(--orange);font-variant-numeric:tabular-nums;font-size:12.5px;min-width:46px;direction:ltr;text-align:left}
+.tl-item.cur{background:color-mix(in srgb,var(--orange) 16%,transparent);border-radius:10px}
+.tl-item.cur b{color:var(--orange)}
+
+/* ---------- رنگ هم‌رنگ کاور پشت پلیر ---------- */
+.player-page{--cov:transparent}
+.bg-cover:before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
+ background:radial-gradient(120% 70% at 50% 22%,var(--cov),transparent 72%);opacity:.5;transition:background .6s}
+
+/* ---------- پاسخ DJ به نظرات ---------- */
+.comment.is-dj{border-color:color-mix(in srgb,var(--orange) 55%,transparent)}
+.dj-badge{display:inline-flex;align-items:center;gap:3px;margin-inline-start:6px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:800;background:var(--orange);color:#111;vertical-align:middle}
+.replies{margin:8px 0 0;padding-inline-start:14px;border-inline-start:2px solid color-mix(in srgb,var(--orange) 50%,transparent)}
+.replies .comment{margin-top:8px}
+
+/* ---------- اشتراک پلی‌لیست ---------- */
+.share-playlist{display:block;margin:0 0 14px;padding:9px 14px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:var(--orange);font-size:13px}
+.song>div{min-width:0;flex:1}
+.song b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.song .dots,.song .time{flex-shrink:0}

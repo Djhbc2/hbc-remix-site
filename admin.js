@@ -70,6 +70,7 @@ function onLoggedIn() {
   loadAbout();
   loadAdminComments();
   loadDjProfile();
+  loadRequests();
 }
 
 // ---------- درباره ریمیکس ----------
@@ -195,6 +196,9 @@ async function loadAdminSongs() {
 <input type="text" class="edit-artist" value="${escapeHtml(s.artist)}">
 <label>مدت زمان</label>
 <input type="text" class="edit-time" value="${escapeHtml(s.time)}">
+<label>فهرست زمان‌دار ست/میکس (هر خط: دقیقه:ثانیه اسم آهنگ) — اختیاری</label>
+<textarea class="edit-tracklist" rows="5" placeholder="00:00 Intro&#10;03:25 Moon Remix&#10;07:10 Dance Remix">${escapeHtml(tracklistToText(s.tracklist))}</textarea>
+<label class="check-row"><input type="checkbox" class="edit-featured" ${s.featured ? "checked" : ""}> ریمیکس هفته (بالای صفحه‌ی اصلی نمایش داده می‌شود)</label>
 <div class="admin-song-edit-actions">
 <button class="btn-primary save-song" data-id="${s._id}">ذخیره</button>
 <button class="btn-ghost cancel-edit">انصراف</button>
@@ -230,7 +234,9 @@ async function loadAdminSongs() {
         const title = wrap.querySelector(".edit-title").value;
         const artist = wrap.querySelector(".edit-artist").value;
         const time = wrap.querySelector(".edit-time").value;
-        saveSongEdit(btn.dataset.id, { title, artist, time });
+        const tracklist = wrap.querySelector(".edit-tracklist").value;
+        const featured = wrap.querySelector(".edit-featured").checked;
+        saveSongEdit(btn.dataset.id, { title, artist, time }, { tracklist, featured });
       };
     });
   } catch (e) {
@@ -238,9 +244,20 @@ async function loadAdminSongs() {
   }
 }
 
-async function saveSongEdit(id, body) {
+function tracklistToText(list = []) {
+  const p = (n) => String(n).padStart(2, "0");
+  return list
+    .map((x) => {
+      const h = Math.floor(x.t / 3600), m = Math.floor((x.t % 3600) / 60), sec = x.t % 60;
+      return (h ? h + ":" + p(m) : p(m)) + ":" + p(sec) + " " + x.title;
+    })
+    .join("\n");
+}
+
+async function saveSongEdit(id, body, meta) {
   try {
     await apiJson(`/admin/songs/${id}`, { method: "PUT", body });
+    if (meta) await apiJson(`/admin/songs/${id}/meta`, { method: "PUT", body: meta });
     toast("آهنگ ویرایش شد");
     loadAdminSongs();
   } catch (e) {
@@ -274,10 +291,11 @@ async function loadAdminComments() {
           .map(
             (c) => `<div class="admin-comment" data-id="${c._id}">
 <div class="admin-comment-head">
-<b>${escapeHtml(c.name)}</b>
-<small>روی «${escapeHtml(c.songTitle)}»</small>
+<b>${escapeHtml(c.name)}${c.isDj ? " ✔" : ""}</b>
+<small>${c.parent ? "پاسخ " : ""}روی «${escapeHtml(c.songTitle)}»</small>
 </div>
 <textarea class="admin-comment-text">${escapeHtml(c.text)}</textarea>
+${c.isDj || !c.songId ? "" : `<div class="reply-row"><input type="text" class="reply-input" maxlength="500" placeholder="پاسخ به عنوان DJ HBC..."><button class="btn-primary reply-send" data-song="${c.songId}">پاسخ</button></div>`}
 <div class="admin-comment-actions">
 <button class="btn-ghost save-comment">ذخیره ویرایش</button>
 <button class="btn-danger delete-comment">حذف</button>
@@ -293,6 +311,22 @@ async function loadAdminComments() {
         const id = wrap.dataset.id;
         const text = wrap.querySelector(".admin-comment-text").value;
         saveComment(id, text);
+      };
+    });
+
+    document.querySelectorAll(".reply-send").forEach((btn) => {
+      btn.onclick = async () => {
+        const wrap = btn.closest(".admin-comment");
+        const input = wrap.querySelector(".reply-input");
+        const text = input.value.trim();
+        if (!text) return;
+        try {
+          await apiJson(`/comments/${btn.dataset.song}`, { method: "POST", body: { text, parent: wrap.dataset.id } });
+          toast("پاسخ ثبت شد");
+          loadAdminComments();
+        } catch (e) {
+          toast(e.message);
+        }
       };
     });
 
@@ -324,6 +358,48 @@ async function deleteComment(id) {
     toast("نظر حذف شد");
     loadAdminComments();
     loadStats();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+// ---------- درخواست‌های ریمیکس ----------
+
+async function loadRequests() {
+  try {
+    const list = await apiJson("/admin/requests");
+    $("adminRequests").innerHTML = list.length
+      ? list
+          .map(
+            (r) => `<div class="admin-comment${r.done ? " done" : ""}" data-id="${r._id}">
+<div class="admin-comment-head"><b>${escapeHtml(r.name)}</b><small>${new Date(r.createdAt).toLocaleDateString("fa-IR")}</small></div>
+<p class="req-text">${escapeHtml(r.text)}</p>
+<div class="admin-comment-actions">
+<button class="btn-ghost req-done">${r.done ? "برگردان به انجام‌نشده" : "انجام شد ✓"}</button>
+<button class="btn-danger req-del">حذف</button>
+</div>
+</div>`
+          )
+          .join("")
+      : `<p class="hint">هنوز درخواستی نیامده.</p>`;
+    document.querySelectorAll(".req-done").forEach((b) => {
+      b.onclick = async () => {
+        const wrap = b.closest(".admin-comment");
+        try {
+          await apiJson(`/admin/requests/${wrap.dataset.id}`, { method: "PUT", body: { done: !wrap.classList.contains("done") } });
+          loadRequests();
+        } catch (e) { toast(e.message); }
+      };
+    });
+    document.querySelectorAll(".req-del").forEach((b) => {
+      b.onclick = async () => {
+        if (!confirm("این درخواست حذف بشه؟")) return;
+        try {
+          await apiJson(`/admin/requests/${b.closest(".admin-comment").dataset.id}`, { method: "DELETE" });
+          loadRequests();
+        } catch (e) { toast(e.message); }
+      };
+    });
   } catch (e) {
     toast(e.message);
   }

@@ -98,6 +98,26 @@
   </div>
 </div>
 
+<div id="tracklistOverlay" class="welcome-overlay hide">
+  <div class="welcome-card tracklist-card">
+    <h3>فهرست ست</h3>
+    <div id="tracklistItems" class="tracklist-items"></div>
+    <button id="tracklistCloseBtn" class="welcome-btn">بستن</button>
+  </div>
+</div>
+<div id="themeOverlay" class="welcome-overlay hide">
+  <div class="welcome-card">
+    <h3>انتخاب رنگ سایت</h3>
+    <div id="themeSwatches" class="theme-swatches">
+      <button data-theme="orange" style="--c:#ff9f0a" aria-label="نارنجی"></button>
+      <button data-theme="blue" style="--c:#2ea8ff" aria-label="آبی"></button>
+      <button data-theme="purple" style="--c:#a45bff" aria-label="بنفش"></button>
+      <button data-theme="pink" style="--c:#ff4f9a" aria-label="صورتی"></button>
+      <button data-theme="green" style="--c:#2fd27a" aria-label="سبز"></button>
+    </div>
+    <button id="themeCloseBtn" class="welcome-btn">بستن</button>
+  </div>
+</div>
 <div id="djProfileOverlay" class="welcome-overlay hide">
   <div class="welcome-card dj-card">
     <img id="djPhoto" class="dj-photo" src="" alt="">
@@ -128,8 +148,10 @@
     <li><button data-nav="chartPage">📊 پرطرفدارترین‌ها</button></li>
     <li><button id="profileNavBtn" data-nav="profilePage" class="hidden">⚙️ پروفایل من</button></li>
     <li><button data-nav="commentsPage">💬 ثبت نظر</button></li>
+    <li><button data-nav="requestPage">🎤 درخواست ریمیکس</button></li>
     <li><button id="aboutNavBtn">🎙️ درباره ریمیکس</button></li>
     <li><button id="djProfileNavBtn">🎧 پروفایل DJ HBC</button></li>
+    <li><button id="themeNavBtn">🎨 رنگ سایت</button></li>
     <li><button id="notifyBtn">🔔 فعال کردن اعلان آهنگ جدید</button></li>
     <li><button id="authNavBtn" data-nav="authPage">👤 ثبت‌نام / ورود</button></li>
     <li><button id="logoutBtn" class="hidden">🚪 خروج از حساب</button></li>
@@ -150,11 +172,19 @@
       <button id="searchBtn">⌕</button>
     </div>
 
+    <div id="featuredBox" class="featured hidden"></div>
     <div class="sort-tabs">
       <button class="sort-tab active" data-sort="newest">🆕 جدیدترین</button>
       <button class="sort-tab" data-sort="trending">🔥 پرطرفدار</button>
     </div>
 
+    <div id="genreChips" class="genre-chips">
+      <button class="chip active" data-genre="all">همه</button>
+      <button class="chip" data-genre="شاد">شاد</button>
+      <button class="chip" data-genre="بیس">بیس‌دار</button>
+      <button class="chip" data-genre="پادکست">پادکست</button>
+      <button class="chip" data-genre="set">ست و میکس</button>
+    </div>
     <div id="songs" class="songs"></div>
     <p id="songsEmpty" class="empty hidden">هنوز آهنگی اضافه نشده است.</p>
   </section>
@@ -175,11 +205,12 @@
     </header>
 
     <div class="stage">
-      <div class="cover-box"><img id="playerCover" src="assets/cover1.jpg" alt="cover"></div>
+      <div class="cover-box"><img id="playerCover" src="assets/cover1.jpg" alt="cover"><div id="viz" class="viz" aria-hidden="true"></div></div>
 
       <div class="song-info">
         <h1 id="playerTitle">Bsdky music</h1>
         <p id="playerArtist">Disclosure</p>
+        <button id="tracklistBtn" class="tracklist-btn hidden" type="button">📋 فهرست ست — <span id="trackNow"></span></button>
       </div>
 
       <div id="starRow" class="star-row">
@@ -295,10 +326,33 @@
       <button class="back-inline" data-nav="songsPage">→ بازگشت</button>
     </header>
     <div class="title-row"><h2>پلی‌لیست من</h2></div>
+    <button id="sharePlaylistBtn" class="btn-ghost share-playlist hidden" type="button">🔗 اشتراک‌گذاری پلی‌لیست من</button>
     <div id="playlistSongs" class="songs"></div>
     <p id="playlistEmpty" class="empty hidden">برای دیدن پلی‌لیست باید وارد حساب شوید و آهنگ سیو کنید.</p>
   </section>
 
+  <!-- پلی‌لیست عمومی که کسی با لینک فرستاده -->
+  <section id="publicPlaylistPage" class="page">
+    <header class="header">
+      <button class="back-inline" data-nav="songsPage">→ بازگشت</button>
+    </header>
+    <div class="title-row"><h2 id="publicPlaylistTitle">پلی‌لیست</h2></div>
+    <div id="publicPlaylistSongs" class="songs"></div>
+    <p id="publicPlaylistEmpty" class="empty hidden">این پلی‌لیست خالی است یا پیدا نشد.</p>
+  </section>
+  <!-- درخواست ریمیکس -->
+  <section id="requestPage" class="page">
+    <header class="header">
+      <button class="back-inline" data-nav="songsPage">→ بازگشت</button>
+    </header>
+    <div class="title-row"><h2>درخواست ریمیکس</h2></div>
+    <p class="hint" style="text-align:right">آهنگی که دوست داری DJ HBC ریمیکسش کنه رو بنوس (اسم آهنگ و خواننده).</p>
+    <form id="requestForm" class="form">
+      <textarea id="requestText" rows="3" maxlength="300" placeholder="مثلاً: آهنگ «...» از «...»" required></textarea>
+      <button type="submit" class="btn-primary">ارسال درخواست</button>
+    </form>
+    <p id="requestLoginHint" class="hint hidden">برای ارسال درخواست باید وارد حساب شوی.</p>
+  </section>
   <!-- صفحه پروفایل کاربری -->
   <section id="profilePage" class="page">
     <header class="header">

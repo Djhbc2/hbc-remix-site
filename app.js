@@ -4,6 +4,16 @@ const API_BASE = "https://api.djhbc.ir/api";
 
 const $ = (id) => document.getElementById(id);
 
+// ---------- تم (رنگ اصلی سایت) ----------
+const THEMES = ["orange", "blue", "purple", "pink", "green"];
+function applyTheme(t) {
+  if (!THEMES.includes(t)) t = "orange";
+  document.documentElement.setAttribute("data-theme", t);
+  try { localStorage.setItem("hbc_theme", t); } catch (e) {}
+  document.querySelectorAll("#themeSwatches button").forEach((b) => b.classList.toggle("sel", b.dataset.theme === t));
+}
+applyTheme((() => { try { return localStorage.getItem("hbc_theme"); } catch (e) { return null; } })());
+
 const audio = $("audio");
 
 let songs = [];
@@ -65,6 +75,7 @@ async function loadSongs(sort = currentSort) {
   currentSort = sort;
   try {
     songs = await api(`/songs?sort=${sort}`);
+    if (sort === "newest") writeSongsCache(songs);
   } catch (e) {
     songs = [];
     // متن خطای واقعی رو نشون می‌ده تا علت مشخص بشه
@@ -75,9 +86,50 @@ async function loadSongs(sort = currentSort) {
 
 function afterSongsLoaded() {
   renderSongs();
+  renderFeatured();
   if (songs.length) setSong(0);
   checkNewSongsBadge();
   openSharedSongIfAny();
+  openSharedPlaylistIfAny();
+}
+
+// ---------- کش لیست آهنگ‌ها (باز شدن فوری سایت) ----------
+function readSongsCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem("hbc_songs_cache") || "null");
+    return Array.isArray(c) && c.length ? c : null;
+  } catch (e) { return null; }
+}
+function writeSongsCache(list) {
+  try { localStorage.setItem("hbc_songs_cache", JSON.stringify(list)); } catch (e) {}
+}
+
+async function fetchSongsList(attempts) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const list = await api(`/songs?sort=newest`, { timeout: 35000 });
+      if (Array.isArray(list)) return list;
+    } catch (e) {}
+    if (i < attempts - 1) await sleep(1500);
+  }
+  return null;
+}
+
+// لیست تازه از سرور رسید: لیست رو عوض می‌کنیم ولی پخش جاری رو قطع نمی‌کنیم
+function applyFreshSongs(list) {
+  writeSongsCache(list);
+  if (currentSort !== "newest") return;
+  const curId = songs[current] && songs[current]._id;
+  songs = list;
+  const idx = list.findIndex((s) => s._id === curId);
+  if (idx >= 0) current = idx;
+  else if (!playing && list.length) setSong(0);
+  else current = Math.min(current, Math.max(list.length - 1, 0));
+  renderSongs();
+  renderFeatured();
+  checkNewSongsBadge();
+  openSharedSongIfAny();
+  openSharedPlaylistIfAny();
 }
 
 // ---------- صفحه لودینگ (فقط بار اول) ----------
@@ -97,6 +149,16 @@ function hideLoader() {
 async function bootLoad() {
   if (!loaderEl) {
     loadSongs();
+    return;
+  }
+  // اگه قبلاً لیست رو گرفته باشیم، سایت فوری باز می‌شه و لیست تازه پشت صحنه میاد
+  const cached = readSongsCache();
+  if (cached && currentSort === "newest") {
+    songs = cached;
+    afterSongsLoaded();
+    hideLoader();
+    const fresh = await fetchSongsList(3);
+    if (fresh) applyFreshSongs(fresh);
     return;
   }
   loaderEl.classList.remove("failed");
@@ -123,6 +185,7 @@ async function bootLoad() {
     $("loaderRetry").classList.remove("hidden");
     return;
   }
+  writeSongsCache(songs);
   // حداقل زمان نمایش، تا انیمیشن لوگو برای یک لحظه نپره
   const wait = 900 - (Date.now() - startedAt);
   if (wait > 0) await sleep(wait);
@@ -140,14 +203,26 @@ document.querySelectorAll(".sort-tab").forEach((btn) => {
   };
 });
 
+let genreFilter = "all";
+
+function matchGenre(s) {
+  if (genreFilter === "all") return true;
+  if (genreFilter === "set") return (s.tracklist && s.tracklist.length > 0) || /ست|میکس|mix|set/i.test(s.title + " " + s.artist);
+  return (s.title + " " + s.artist).includes(genreFilter);
+}
+
+const isNewSong = (s) => s.createdAt && Date.now() - new Date(s.createdAt).getTime() < 7 * 864e5;
+
 function renderSongs() {
-  $("songsEmpty").classList.toggle("hidden", songs.length > 0);
+  const visible = songs.filter(matchGenre).length;
+  $("songsEmpty").classList.toggle("hidden", visible > 0);
+  $("songsEmpty").textContent = songs.length ? "آهنگی در این دسته نیست." : "هنوز آهنگی اضافه نشده است.";
   $("songs").innerHTML = songs
     .map(
       (s, i) => `
-<button class="song" data-index="${i}">
+<button class="song${matchGenre(s) ? "" : " gone"}" data-index="${i}">
 <img src="${s.cover}" alt="">
-<div><b>${escapeHtml(s.title)}</b><small>${escapeHtml(s.artist)}</small></div>
+<div><b>${escapeHtml(s.title)}</b><small>${escapeHtml(s.artist)}${isNewSong(s) ? '<span class="new-tag">NEW</span>' : ""}</small></div>
 <span class="time">${s.time}</span>
 <span class="dots">•••</span>
 </button>`
@@ -155,6 +230,28 @@ function renderSongs() {
     .join("");
   document.querySelectorAll("#songs .song").forEach((x) => (x.onclick = () => openPlayer(+x.dataset.index)));
   updateNowPlayingBadge();
+}
+
+document.querySelectorAll("#genreChips .chip").forEach((chip) => {
+  chip.onclick = () => {
+    genreFilter = chip.dataset.genre;
+    document.querySelectorAll("#genreChips .chip").forEach((c) => c.classList.toggle("active", c === chip));
+    renderSongs();
+  };
+});
+
+// ریمیکس هفته
+function renderFeatured() {
+  const box = $("featuredBox");
+  const idx = songs.findIndex((s) => s.featured);
+  if (idx < 0) { box.classList.add("hidden"); return; }
+  const s = songs[idx];
+  box.innerHTML = `<img src="${s.cover}" alt=""><div><small>🔥 ریمیکس هفته</small><b>${escapeHtml(s.title)}</b><span class="f-art">${escapeHtml(s.artist)}</span></div><span class="f-play"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M8 5v14l11-7-11-7z" fill="currentColor"/></svg></span>`;
+  box.classList.remove("hidden");
+  box.onclick = () => {
+    const i = songs.findIndex((x) => x.featured);
+    if (i >= 0) openPlayer(i);
+  };
 }
 
 // نمایش نشانگر «در حال پخش» (اکولایزر) کنار آهنگ فعال تو لیست
@@ -306,6 +403,9 @@ function setSong(i) {
   updateLikeIcon();
   updateNowPlayingBadge();
   scheduleStatus();
+  updateTracklistUI();
+  applyCoverTheme(s.cover);
+  updateMediaMeta(s);
 }
 
 function openPlayer(i) {
@@ -335,6 +435,8 @@ function updateButtons() {
   $("iconPlay").classList.toggle("hidden", playing);
   $("iconPause").classList.toggle("hidden", !playing);
   $("miniPlay").textContent = playing ? "Ⅱ" : "▶";
+  document.body.classList.toggle("is-playing", playing);
+  if ("mediaSession" in navigator) navigator.mediaSession.playbackState = playing ? "playing" : "paused";
   updateNowPlayingBadge();
   scheduleStatus();
 }
@@ -400,7 +502,8 @@ document.querySelectorAll(".star").forEach((star) => {
 $("shareBtn").onclick = async () => {
   if (!songs.length) return;
   const s = songs[current];
-  const url = `${location.origin}${location.pathname}?song=${s._id}`;
+  // لینک از طریق سرور می‌ره تا تو تلگرام/اینستاگرام کارت کاور + اسم آهنگ نشون داده بشه
+  const url = API_BASE.replace(/\/api$/, "") + "/s/" + s._id;
   const shareData = { title: s.title, text: `آهنگ «${s.title}» رو تو HBC REMIX گوش کن 🎧`, url };
   if (navigator.share) {
     try {
@@ -435,6 +538,8 @@ audio.ontimeupdate = () => {
   $("miniProgress").style.width = p + "%";
   $("current").textContent = new Date(audio.currentTime * 1000).toISOString().slice(14, 19);
   if (songs[current]) playPositions[songs[current]._id] = audio.currentTime;
+  updateTrackNow();
+  updatePositionState();
 };
 
 audio.onended = () => {
@@ -527,6 +632,7 @@ function navigate(pageId) {
   if (pageId === "chartPage") loadChart();
   if (pageId === "playerPage") fitStatus();
   if (pageId === "authPage") initGoogle();
+  if (pageId === "requestPage") updateRequestPage();
   // مینی‌پلیر: وقتی از صفحه پلیر خارج می‌شیم ولی آهنگی بارگذاری شده، نشونش بده تا پخش پس‌زمینه ادامه پیدا کنه
   if (pageId !== "playerPage" && songs.length && audio.src) {
     $("miniPlayer").classList.remove("hidden");
@@ -738,6 +844,7 @@ async function onGoogleCredential(resp) {
 // ---------- پلی‌لیست من ----------
 
 async function loadPlaylist() {
+  $("sharePlaylistBtn").classList.toggle("hidden", !token || !currentUser);
   if (!token) {
     $("playlistSongs").innerHTML = "";
     $("playlistEmpty").classList.remove("hidden");
@@ -779,11 +886,10 @@ async function loadComments() {
   $("commentForm").classList.toggle("hidden", !token);
   try {
     const list = await api(`/comments/${s._id}`);
-    $("commentsList").innerHTML = list.length
-      ? list
-          .map(
-            (c) => `<div class="comment">
-<b>${escapeHtml(c.name)}</b>
+    const replies = {};
+    list.filter((c) => c.parent).reverse().forEach((c) => (replies[c.parent] = replies[c.parent] || []).push(c));
+    const commentHtml = (c) => `<div class="comment${c.isDj ? " is-dj" : ""}">
+<b>${escapeHtml(c.name)}${c.isDj ? '<span class="dj-badge">✔ تأییدشده</span>' : ""}</b>
 <p>${escapeHtml(c.text)}</p>
 <div class="comment-foot">
 <small>${new Date(c.createdAt).toLocaleDateString("fa-IR")}</small>
@@ -791,9 +897,14 @@ async function loadComments() {
 <svg viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.4-9.3-8.8C1.2 8 2.6 4.8 5.7 4.1 7.9 3.6 10 4.6 12 7c2-2.4 4.1-3.4 6.3-2.9 3.1.7 4.5 3.9 3 6.1C19 15.6 12 20 12 20z" stroke="currentColor" stroke-width="1.8"/></svg>
 <span>${c.likeCount || 0}</span>
 </button>
-</div>
-</div>`
-          )
+</div>`;
+    const tops = list.filter((c) => !c.parent);
+    $("commentsList").innerHTML = tops.length
+      ? tops
+          .map((c) => {
+            const rs = replies[c._id] || [];
+            return commentHtml(c) + (rs.length ? `<div class="replies">${rs.map((r) => commentHtml(r) + "</div>").join("")}</div>` : "") + "</div>";
+          })
           .join("")
       : `<p class="empty">هنوز نظری ثبت نشده. اولین نفر باش!</p>`;
     document.querySelectorAll(".comment-like").forEach((btn) => {
@@ -935,12 +1046,17 @@ if (songsNavBtn) {
 
 // ---------- باز کردن مستقیم آهنگ از لینک اشتراک‌گذاری‌شده (?song=ID) ----------
 
+let sharedSongHandled = false;
 function openSharedSongIfAny() {
   const params = new URLSearchParams(location.search);
   const songId = params.get("song");
   if (!songId) return;
+  if (sharedSongHandled) return;
   const idx = songs.findIndex((s) => s._id === songId);
-  if (idx >= 0) openPlayer(idx);
+  if (idx >= 0) {
+    sharedSongHandled = true;
+    openPlayer(idx);
+  }
 }
 
 // ---------- اعلان آهنگ جدید (Push Notification) ----------
@@ -1019,6 +1135,217 @@ document.querySelectorAll(".dock-controls button,.icon-btn-sm,.dock-nav button,.
     btn.classList.add("pop-anim");
   });
 });
+
+// ---------- فهرست زمان‌دار ست/میکس ----------
+
+function fmtT(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = Math.floor(sec % 60);
+  const p = (n) => String(n).padStart(2, "0");
+  return (h ? h + ":" : "") + p(m) + ":" + p(x);
+}
+
+function currentTrackIdx() {
+  const tl = (songs[current] && songs[current].tracklist) || [];
+  let idx = -1;
+  for (let i = 0; i < tl.length; i++) {
+    if (audio.currentTime >= tl[i].t) idx = i;
+    else break;
+  }
+  return idx;
+}
+
+function updateTracklistUI() {
+  const tl = (songs[current] && songs[current].tracklist) || [];
+  $("tracklistBtn").classList.toggle("hidden", !tl.length);
+  updateTrackNow();
+}
+
+let lastTrackIdx = -2;
+function updateTrackNow() {
+  const tl = (songs[current] && songs[current].tracklist) || [];
+  if (!tl.length) return;
+  const i = Math.max(currentTrackIdx(), 0);
+  if (i === lastTrackIdx) return;
+  lastTrackIdx = i;
+  $("trackNow").textContent = tl[i].title;
+  if (!$("tracklistOverlay").classList.contains("hide")) renderTracklistItems();
+}
+
+function renderTracklistItems() {
+  const tl = (songs[current] && songs[current].tracklist) || [];
+  const cur = Math.max(currentTrackIdx(), 0);
+  $("tracklistItems").innerHTML = tl
+    .map((x, i) => `<button class="tl-item${i === cur ? " cur" : ""}" data-t="${x.t}"><span class="tl-t">${fmtT(x.t)}</span><b>${escapeHtml(x.title)}</b></button>`)
+    .join("");
+  document.querySelectorAll("#tracklistItems .tl-item").forEach((b) => {
+    b.onclick = () => {
+      audio.currentTime = +b.dataset.t;
+      if (audio.paused) togglePlay();
+      $("tracklistOverlay").classList.add("hide");
+    };
+  });
+}
+
+$("tracklistBtn").onclick = () => {
+  lastTrackIdx = -2;
+  renderTracklistItems();
+  $("tracklistOverlay").classList.remove("hide");
+};
+$("tracklistCloseBtn").onclick = () => $("tracklistOverlay").classList.add("hide");
+
+// ---------- ویژوالایزر (میله‌های رقصان روی کاور؛ فقط ظاهری و بدون دسترسی به فایل صوتی) ----------
+
+(function buildViz() {
+  const box = $("viz");
+  let html = "";
+  for (let i = 0; i < 28; i++) {
+    const h = 25 + Math.round(Math.random() * 75);
+    const d = (0.55 + Math.random() * 0.8).toFixed(2);
+    html += `<i style="--h:${h}%;--d:${d}s;animation-delay:-${(Math.random() * 1.2).toFixed(2)}s"></i>`;
+  }
+  box.innerHTML = html;
+})();
+
+// ---------- رنگ پس‌زمینه‌ی پلیر هم‌رنگ کاور ----------
+
+const coverColorCache = {};
+function applyCoverTheme(url) {
+  const page = $("playerPage");
+  if (coverColorCache[url] !== undefined) {
+    page.style.setProperty("--cov", coverColorCache[url] || "transparent");
+    return;
+  }
+  page.style.setProperty("--cov", "transparent");
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    let col = "";
+    try {
+      const c = document.createElement("canvas");
+      c.width = c.height = 24;
+      const x = c.getContext("2d");
+      x.drawImage(img, 0, 0, 24, 24);
+      const d = x.getImageData(0, 0, 24, 24).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+        const sat = mx ? (mx - mn) / mx : 0;
+        if (sat < 0.25 || mx < 60) continue;
+        const w = sat * mx;
+        r += d[i] * w; g += d[i + 1] * w; b += d[i + 2] * w; n += w;
+      }
+      if (n) col = `rgb(${Math.round(r / n)},${Math.round(g / n)},${Math.round(b / n)})`;
+    } catch (e) {}
+    coverColorCache[url] = col;
+    if (songs[current] && songs[current].cover === url) page.style.setProperty("--cov", col || "transparent");
+  };
+  // اگه ذخیره‌ساز عکس اجازه‌ی خوندن پیکسل‌ها رو نده، همون پس‌زمینه‌ی پیش‌فرض می‌مونه
+  img.onerror = () => { coverColorCache[url] = ""; };
+  img.src = url;
+}
+
+// ---------- کنترل از صفحه‌ی قفل و اعلان‌های گوشی (Media Session) ----------
+
+function updateMediaMeta(s) {
+  if (!("mediaSession" in navigator) || typeof MediaMetadata === "undefined") return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: s.title,
+      artist: s.artist,
+      album: "HBC REMIX",
+      artwork: [{ src: s.cover, sizes: "512x512" }],
+    });
+  } catch (e) {}
+}
+
+let lastPosUpdate = 0;
+function updatePositionState() {
+  if (!("mediaSession" in navigator) || !navigator.mediaSession.setPositionState) return;
+  const now = Date.now();
+  if (now - lastPosUpdate < 1000 || !audio.duration || !isFinite(audio.duration)) return;
+  lastPosUpdate = now;
+  try {
+    navigator.mediaSession.setPositionState({ duration: audio.duration, position: Math.min(audio.currentTime, audio.duration), playbackRate: 1 });
+  } catch (e) {}
+}
+
+(function setupMediaSession() {
+  if (!("mediaSession" in navigator)) return;
+  const set = (name, fn) => { try { navigator.mediaSession.setActionHandler(name, fn); } catch (e) {} };
+  set("play", () => { if (audio.paused) togglePlay(); });
+  set("pause", () => { if (!audio.paused) togglePlay(); });
+  set("previoustrack", prev);
+  set("nexttrack", next);
+  set("seekbackward", () => { audio.currentTime = Math.max(0, audio.currentTime - 10); });
+  set("seekforward", () => { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10); });
+  set("seekto", (d) => { if (d && typeof d.seekTime === "number") audio.currentTime = d.seekTime; });
+})();
+
+// ---------- انتخاب رنگ سایت ----------
+
+$("themeNavBtn").onclick = () => {
+  closeDrawer();
+  applyTheme(document.documentElement.getAttribute("data-theme"));
+  $("themeOverlay").classList.remove("hide");
+};
+$("themeCloseBtn").onclick = () => $("themeOverlay").classList.add("hide");
+document.querySelectorAll("#themeSwatches button").forEach((b) => (b.onclick = () => applyTheme(b.dataset.theme)));
+
+// ---------- درخواست ریمیکس ----------
+
+function updateRequestPage() {
+  $("requestForm").classList.toggle("hidden", !token);
+  $("requestLoginHint").classList.toggle("hidden", !!token);
+}
+
+$("requestForm").onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const data = await api("/requests", { method: "POST", body: { text: $("requestText").value } });
+    $("requestText").value = "";
+    toast(data.message || "درخواستت ثبت شد");
+  } catch (err) {
+    toast(err.message);
+  }
+};
+
+// ---------- پلی‌لیست عمومی (اشتراک با لینک) ----------
+
+$("sharePlaylistBtn").onclick = async () => {
+  if (!currentUser) return;
+  const url = `${location.origin}${location.pathname}?playlist=${currentUser.id || currentUser._id}`;
+  const data = { title: "پلی‌لیست من در HBC REMIX", text: "پلی‌لیست آهنگ‌های مورد علاقه‌ام 🎧", url };
+  if (navigator.share) {
+    try { await navigator.share(data); } catch (e) {}
+  } else {
+    try { await navigator.clipboard.writeText(url); toast("لینک پلی‌لیست کپی شد"); } catch (e) { toast("لینک: " + url); }
+  }
+};
+
+let sharedPlaylistHandled = false;
+async function openSharedPlaylistIfAny() {
+  if (sharedPlaylistHandled) return;
+  const id = new URLSearchParams(location.search).get("playlist");
+  if (!id) return;
+  sharedPlaylistHandled = true;
+  navigate("publicPlaylistPage");
+  try {
+    const data = await api(`/playlist/public/${encodeURIComponent(id)}`);
+    $("publicPlaylistTitle").textContent = `پلی‌لیست ${data.name}`;
+    $("publicPlaylistEmpty").classList.toggle("hidden", data.songs.length > 0);
+    $("publicPlaylistSongs").innerHTML = data.songs
+      .map((s) => {
+        const idx = songs.findIndex((x) => x._id === s._id);
+        return `<button class="song" data-index="${idx}"><img src="${s.cover}" alt=""><div><b>${escapeHtml(s.title)}</b><small>${escapeHtml(s.artist)}</small></div><span class="time">${s.time}</span><span class="dots">•••</span></button>`;
+      })
+      .join("");
+    document.querySelectorAll("#publicPlaylistSongs .song").forEach((x) => {
+      x.onclick = () => { const i = +x.dataset.index; if (i >= 0) openPlayer(i); };
+    });
+  } catch (e) {
+    $("publicPlaylistEmpty").classList.remove("hidden");
+  }
+}
 
 // ---------- شروع ----------
 
